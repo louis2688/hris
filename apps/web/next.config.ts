@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg", "bcryptjs"],
   typedRoutes: false,
   poweredByHeader: false,
+  // Document uploads: 5 MB file cap + multipart overhead (default is 1 MB).
+  experimental: { serverActions: { bodySizeLimit: "6mb" } },
   headers: async () => [
     {
       source: "/(.*)",

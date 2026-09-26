@@ -10,8 +10,9 @@ function createClient() {
   const adapter = new PrismaPg({ connectionString, max: 10 });
   return new PrismaClient({
     adapter,
-    // Selfie bytes stay out of every list query; fetch explicitly with select: { photo: true }.
-    omit: { attendancePunch: { photo: true } },
+    // Selfie / document bytes stay out of every query; fetch explicitly with omit: { data: false } / select.
+    // ponytail: documents live in Postgres bytea (5 MB cap). Move bytes to Supabase Storage (keep this row as metadata + object key) if volume grows.
+    omit: { attendancePunch: { photo: true }, document: { data: true } },
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
 }

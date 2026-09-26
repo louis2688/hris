@@ -18,6 +18,9 @@ import { loadFormOptions } from "../options";
 import { AccountPanel } from "./account-panel";
 import { QualTab } from "@/components/qual-tab";
 import { EntitlementEditor } from "./entitlement-editor";
+import { DocumentsCard } from "@/components/documents-card";
+import { listForEmployee, uploadCategories } from "@/server/services/documents";
+import type { SessionUser } from "@hris/shared";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -37,6 +40,7 @@ const TABS = [
   { key: "emergency", label: "Emergency" },
   { key: "qualifications", label: "Qualifications" },
   { key: "leave", label: "Leave" },
+  { key: "documents", label: "Documents" },
   { key: "account", label: "Account" },
 ];
 
@@ -48,8 +52,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
   const e = await getEmployee(id).catch(() => null);
   if (!e) notFound();
 
-  // Managers viewing a report: overview + leave only.
-  const tabs = staff ? TABS : TABS.filter((t) => t.key === "overview" || t.key === "leave");
+  // Managers viewing a report: overview + leave + documents (view only).
+  const tabs = staff ? TABS : TABS.filter((t) => t.key === "overview" || t.key === "leave" || t.key === "documents");
   const active = tabs.some((t) => t.key === tab) ? tab : "overview";
 
   return (
@@ -87,6 +91,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       {active === "emergency" ? <EmergencyContacts employeeId={e.id} contacts={e.emergencyContacts} /> : null}
       {active === "qualifications" ? <QualTab employeeId={e.id} /> : null}
       {active === "leave" ? <LeaveTab employeeId={e.id} staff={staff} /> : null}
+      {active === "documents" ? <DocumentsTab user={user} employeeId={e.id} /> : null}
       {active === "account" ? <AccountPanel employeeId={e.id} account={e.user} defaultEmail={e.workEmail ?? ""} isSelf={e.user?.id === user.id} isAdmin={user.role === "ADMIN"} /> : null}
     </div>
   );
@@ -111,3 +116,7 @@ async function LeaveTab({ employeeId, staff }: { employeeId: string; staff: bool
   );
 }
 
+
+async function DocumentsTab({ user, employeeId }: { user: SessionUser; employeeId: string }) {
+  return <DocumentsCard docs={await listForEmployee(user, employeeId)} employeeId={employeeId} categories={uploadCategories(user, employeeId)} staff={isStaff(user)} />;
+}

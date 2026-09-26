@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { gate } from "@/server/auth/session";
+import { listForCandidate } from "@/server/services/documents";
+import { DocumentsCard } from "@/components/documents-card";
 import { employeeOptions } from "@/server/services/employees";
 import { allowedStages, getCandidate, listVacancies } from "@/server/services/recruitment";
 import { Card, CardBody, CardHeader, PageHeader } from "@/components/ui/card";
@@ -13,11 +15,11 @@ import { CandidateActions, Interviews } from "./client";
 export const metadata: Metadata = { title: "Candidate" };
 
 export default async function CandidatePage({ params }: { params: Promise<{ id: string }> }) {
-  await gate("ADMIN", "HR");
+  const user = await gate("ADMIN", "HR");
   const { id } = await params;
   const c = await getCandidate(id).catch(() => null);
   if (!c) notFound();
-  const [vacancies, people] = await Promise.all([listVacancies(), employeeOptions()]);
+  const [vacancies, people, docs] = await Promise.all([listVacancies(), employeeOptions(), listForCandidate(user, id)]);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -61,6 +63,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
               {c.notes ? <p className="mt-4 whitespace-pre-line rounded-xl bg-slate-50 p-3 text-sm text-slate-700">{c.notes}</p> : null}
             </CardBody>
           </Card>
+          <DocumentsCard docs={docs} candidateId={c.id} categories={["RESUME", "CERTIFICATE", "ID", "CONTRACT", "OTHER"]} description="Resume, certificates and other files" />
           <Interviews
             candidateId={c.id}
             closed={c.stage === "HIRED" || c.stage === "REJECTED" || c.stage === "WITHDRAWN"}

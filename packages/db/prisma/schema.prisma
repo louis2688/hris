@@ -146,6 +146,15 @@ enum LeaveEventAction {
   COMMENTED
 }
 
+enum DocumentCategory {
+  CONTRACT
+  ID
+  RESUME
+  CERTIFICATE
+  PAYSLIP
+  OTHER
+}
+
 // ---------- Identity ----------
 
 model User {
@@ -164,6 +173,7 @@ model User {
   auditLogs     AuditLog[]
   leaveEvents   LeaveRequestEvent[]
   passkeys      Passkey[]
+  documents     Document[]
 
   @@index([role])
 }
@@ -310,6 +320,7 @@ model Employee {
   interviews        Interview[]
   reviews           PerformanceReview[] @relation("Reviewee")
   reviewsToGive     PerformanceReview[] @relation("Reviewer")
+  documents         Document[]
 
   @@index([lastName, firstName])
   @@index([departmentId])
@@ -453,6 +464,8 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+  @@index([entity, createdAt])
+  @@index([actorUserId])
 }
 
 // ---------- Qualifications (PIM) ----------
@@ -662,6 +675,7 @@ model Candidate {
   vacancy       Vacancy?    @relation(fields: [vacancyId], references: [id], onDelete: SetNull)
   hiredEmployee Employee?   @relation(fields: [hiredEmployeeId], references: [id], onDelete: SetNull)
   interviews    Interview[]
+  documents     Document[]
 
   @@index([vacancyId])
   @@index([stage])
@@ -755,4 +769,29 @@ model ReviewItem {
   kpi    Kpi?              @relation(fields: [kpiId], references: [id], onDelete: SetNull)
 
   @@index([reviewId])
+}
+
+// ---------- Documents ----------
+
+/// File bytes live in Postgres. `data` is omitted from queries by default (see db client).
+model Document {
+  id                String           @id @default(cuid())
+  employeeId        String?
+  candidateId       String?
+  category          DocumentCategory
+  name              String
+  mimeType          String
+  size              Int
+  data              Bytes
+  sha256            String
+  uploadedById      String?
+  visibleToEmployee Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+
+  employee   Employee?  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  candidate  Candidate? @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  uploadedBy User?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([employeeId])
+  @@index([candidateId])
 }

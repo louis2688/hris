@@ -6,6 +6,8 @@ import { ProfileHero, ProfileOverview, TabNav } from "@/components/profile";
 import { EmergencyContacts } from "@/components/emergency-contacts";
 import { SelfEditForm } from "./self-edit-form";
 import { QualTab } from "@/components/qual-tab";
+import { DocumentsCard } from "@/components/documents-card";
+import { listForEmployee, uploadCategories } from "@/server/services/documents";
 
 export const metadata: Metadata = { title: "My Info" };
 
@@ -14,6 +16,7 @@ const TABS = [
   { key: "edit", label: "Edit contact details" },
   { key: "emergency", label: "Emergency contacts" },
   { key: "qualifications", label: "Qualifications" },
+  { key: "documents", label: "Documents" },
 ];
 
 export default async function MePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
@@ -40,6 +43,13 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </Card>
       ) : tab === "qualifications" ? (
         <QualTab employeeId={e.id} />
+      ) : tab === "documents" ? (
+        <DocumentsCard
+          docs={await listForEmployee(user, e.id)}
+          employeeId={e.id}
+          categories={uploadCategories(user, e.id)}
+          description="Your employment documents. You can upload IDs and certificates."
+        />
       ) : tab === "emergency" ? (
         <EmergencyContacts employeeId={e.id} contacts={e.emergencyContacts} />
       ) : (
