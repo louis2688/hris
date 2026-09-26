@@ -71,6 +71,8 @@ export const employeeJobSchema = z.object({
   jobTitleId: optionalStr(),
   locationId: optionalStr(),
   managerId: optionalStr(),
+  shiftId: optionalStr(),
+  biometricId: optionalStr(40),
   employmentType: z.enum(EMPLOYMENT_TYPES).default("FULL_TIME"),
   employmentStatus: z.enum(EMPLOYMENT_STATUSES).default("ACTIVE"),
   hireDate: z.string().min(1, "Hire date is required").refine((v) => !Number.isNaN(Date.parse(v)), "Invalid date"),

@@ -108,6 +108,8 @@ function jobData(d: UpdateEmployeeInput) {
     jobTitleId: d.jobTitleId ?? null,
     locationId: d.locationId ?? null,
     managerId: d.managerId ?? null,
+    shiftId: d.shiftId ?? null,
+    biometricId: d.biometricId ?? null,
     employmentType: d.employmentType,
     employmentStatus: d.employmentStatus,
     hireDate: new Date(d.hireDate),
@@ -185,6 +187,9 @@ export async function updateEmployee(actor: SessionUser, id: string, d: UpdateEm
   if (d.managerId === id) throw new AppError("An employee cannot report to themselves");
   if (d.employeeCode !== before.employeeCode) {
     if (await prisma.employee.findUnique({ where: { employeeCode: d.employeeCode } })) throw conflict("Employee ID already in use");
+  }
+  if (d.biometricId && d.biometricId !== before.biometricId && (await prisma.employee.findUnique({ where: { biometricId: d.biometricId } }))) {
+    throw conflict("That biometric ID is already assigned to another employee");
   }
   const after = await prisma.employee.update({
     where: { id },

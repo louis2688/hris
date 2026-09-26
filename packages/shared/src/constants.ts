@@ -84,3 +84,23 @@ export const QUALIFICATION_LABELS: Record<QualificationKind, string> = { SKILL: 
 export const APPROVER_KINDS = ["MANAGER", "HR", "ADMIN"] as const;
 export type ApproverKind = (typeof APPROVER_KINDS)[number];
 export const APPROVER_LABELS: Record<ApproverKind, string> = { MANAGER: "Direct manager", HR: "HR", ADMIN: "Administrator" };
+
+export const PUNCH_METHODS = ["NONE", "PASSKEY", "PHOTO", "FINGERPRINT", "FACE", "CARD", "PIN"] as const;
+export type PunchMethod = (typeof PUNCH_METHODS)[number];
+export const PUNCH_METHOD_LABELS: Record<PunchMethod, string> = {
+  NONE: "Web",
+  PASSKEY: "Fingerprint / Face ID (device)",
+  PHOTO: "Selfie",
+  FINGERPRINT: "Fingerprint scanner",
+  FACE: "Face scanner",
+  CARD: "Card",
+  PIN: "PIN",
+};
+export const PUNCH_SOURCES = ["WEB", "MOBILE", "DEVICE", "MANUAL"] as const;
+export type PunchSource = (typeof PUNCH_SOURCES)[number];
+
+export const TIMESHEET_STATUSES = ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"] as const;
+export type TimesheetStatus = (typeof TIMESHEET_STATUSES)[number];
+
+export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+export const DEFAULT_TIMEZONE = "Asia/Manila";

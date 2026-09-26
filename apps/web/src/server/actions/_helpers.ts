@@ -38,6 +38,7 @@ export async function run<T>(fn: () => Promise<T>, message?: string): Promise<Ac
     return { ok: true, data: await fn(), message };
   } catch (e) {
     if (e instanceof AppError || e instanceof AuthError) return { ok: false, error: e.message };
+    if ((e as { code?: string }).code === "P2002") return { ok: false, error: "That value is already in use by another record" };
     // Next.js redirect() throws; let it through.
     if (typeof e === "object" && e && "digest" in e && String((e as { digest: unknown }).digest).startsWith("NEXT_")) throw e;
     console.error(e);

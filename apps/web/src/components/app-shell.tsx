@@ -6,7 +6,13 @@ import { usePathname } from "next/navigation";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
+  BarChart3,
   Bell,
+  Briefcase,
+  ClipboardList,
+  Clock,
+  Fingerprint,
+  Target,
   Building2,
   CalendarDays,
   ChevronDown,
@@ -26,25 +32,37 @@ import { ROLE_LABELS } from "@hris/shared";
 import { logoutAction } from "@/server/actions/auth";
 import { cn } from "@/lib/utils";
 
-type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; roles?: SessionUser["role"][] };
+type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; roles?: SessionUser["role"][]; group: "me" | "manage" };
 
+const MANAGERS: SessionUser["role"][] = ["MANAGER", "HR", "ADMIN"];
+const STAFF: SessionUser["role"][] = ["HR", "ADMIN"];
+
+// Order matters: the first 5 visible items become the mobile bottom tabs.
 const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/me", label: "My Info", icon: User },
-  { href: "/me/leave", label: "My Leave", icon: Palmtree },
-  { href: "/team", label: "My Team", icon: UsersRound, roles: ["MANAGER", "HR", "ADMIN"] },
-  { href: "/employees", label: "Employees", icon: Users, roles: ["HR", "ADMIN"] },
-  { href: "/leave", label: "Leave", icon: CalendarDays, roles: ["MANAGER", "HR", "ADMIN"] },
-  { href: "/settings", label: "Settings", icon: Settings, roles: ["HR", "ADMIN"] },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "me" },
+  { href: "/attendance", label: "Attendance", icon: Clock, group: "me" },
+  { href: "/me/leave", label: "My Leave", icon: Palmtree, group: "me" },
+  { href: "/timesheets", label: "Timesheets", icon: ClipboardList, group: "me" },
+  { href: "/me", label: "My Info", icon: User, group: "me" },
+  { href: "/performance", label: "Performance", icon: Target, group: "me" },
+  { href: "/team", label: "My Team", icon: UsersRound, roles: MANAGERS, group: "manage" },
+  { href: "/attendance/team", label: "Team Attendance", icon: Fingerprint, roles: MANAGERS, group: "manage" },
+  { href: "/leave", label: "Leave", icon: CalendarDays, roles: MANAGERS, group: "manage" },
+  { href: "/employees", label: "Employees", icon: Users, roles: STAFF, group: "manage" },
+  { href: "/recruitment", label: "Recruitment", icon: Briefcase, roles: STAFF, group: "manage" },
+  { href: "/reports", label: "Reports", icon: BarChart3, roles: MANAGERS, group: "manage" },
+  { href: "/settings", label: "Settings", icon: Settings, roles: STAFF, group: "manage" },
 ];
 
 function useNav(user: SessionUser) {
   return NAV.filter((n) => !n.roles || n.roles.includes(user.role));
 }
 
-function isActive(pathname: string, href: string) {
-  if (href === "/me") return pathname === "/me" || pathname.startsWith("/me/") && !pathname.startsWith("/me/leave");
-  return pathname === href || pathname.startsWith(href + "/");
+/** Longest matching href wins, so /attendance/team does not also light up /attendance. */
+function activeHref(pathname: string, items: NavItem[]) {
+  return items
+    .filter((n) => pathname === n.href || pathname.startsWith(n.href + "/"))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 }
 
 export function AppShell({ user, unread, children }: { user: SessionUser; unread: number; children: React.ReactNode }) {
@@ -53,13 +71,16 @@ export function AppShell({ user, unread, children }: { user: SessionUser; unread
   const [open, setOpen] = React.useState(false);
   React.useEffect(() => setOpen(false), [pathname]);
 
+  const current = activeHref(pathname, nav);
   const links = (
-    <nav className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
-      {nav.map((n) => {
-        const active = isActive(pathname, n.href);
+    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pt-2 scrollbar-thin">
+      {nav.map((n, i) => {
+        const active = current === n.href;
+        const header = n.group === "manage" && nav[i - 1]?.group === "me";
         return (
+          <React.Fragment key={n.href}>
+          {header ? <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Manage</p> : null}
           <Link
-            key={n.href}
             href={n.href}
             className={cn(
               "group relative flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors duration-150",
@@ -71,6 +92,7 @@ export function AppShell({ user, unread, children }: { user: SessionUser; unread
             <n.icon className={cn("size-[18px] transition-colors", active ? "text-brand-300" : "text-slate-500 group-hover:text-slate-300")} />
             {n.label}
           </Link>
+          </React.Fragment>
         );
       })}
     </nav>
@@ -79,7 +101,7 @@ export function AppShell({ user, unread, children }: { user: SessionUser; unread
   return (
     <div className="flex min-h-dvh">
       {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col bg-ink text-white lg:flex">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-ink text-white lg:flex print:hidden">
         <Brand />
         {links}
         <div className="border-t border-white/10 p-3">
@@ -108,7 +130,7 @@ export function AppShell({ user, unread, children }: { user: SessionUser; unread
 
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Top bar */}
-          <header className="glass sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200/70 px-4 lg:px-6">
+          <header className="glass sticky top-0 z-30 print:hidden flex h-14 items-center gap-3 border-b border-slate-200/70 px-4 lg:px-6">
             <Dialog.Trigger className="-ml-2 flex size-10 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-900/5 lg:hidden" aria-label="Open menu">
               <Menu className="size-5" />
             </Dialog.Trigger>
@@ -130,14 +152,14 @@ export function AppShell({ user, unread, children }: { user: SessionUser; unread
             </div>
           </header>
 
-          <main className="flex-1 px-4 py-5 pb-28 sm:py-6 lg:px-8 lg:pb-8">
+          <main className="flex-1 px-4 py-5 pb-28 sm:py-6 lg:px-8 lg:pb-8 print:p-0">
             <div className="mx-auto w-full max-w-6xl">{children}</div>
           </main>
 
           {/* Mobile bottom tabs */}
-          <nav className="glass fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200/70 px-1 pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Primary">
+          <nav className="glass fixed inset-x-0 bottom-0 z-30 print:hidden flex border-t border-slate-200/70 px-1 pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Primary">
             {nav.slice(0, 5).map((n) => {
-              const active = isActive(pathname, n.href);
+              const active = current === n.href;
               return (
                 <Link key={n.href} href={n.href} className={cn("flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors", active ? "text-brand-600" : "text-slate-500")} aria-current={active ? "page" : undefined}>
                   <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-brand-50")}>
@@ -197,6 +219,11 @@ function UserMenu({ user }: { user: SessionUser }) {
           <DropdownMenu.Item asChild>
             <Link href="/me/password" className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100">
               <KeyRound className="size-4" /> Change password
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/me/security" className="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none hover:bg-slate-100 focus:bg-slate-100">
+              <Fingerprint className="size-4" /> Fingerprint &amp; Face ID
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="my-1 h-px bg-slate-100" />

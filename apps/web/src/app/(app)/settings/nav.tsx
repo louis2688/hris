@@ -12,6 +12,8 @@ const ITEMS = [
   { href: "/settings/leave-types", label: "Leave types" },
   { href: "/settings/entitlements", label: "Entitlements" },
   { href: "/settings/holidays", label: "Holidays" },
+  { href: "/settings/attendance", label: "Attendance" },
+  { href: "/settings/projects", label: "Projects" },
 ];
 
 export function SettingsNav() {

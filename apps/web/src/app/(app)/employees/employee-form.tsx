@@ -47,6 +47,8 @@ type Initial = Partial<{
   jobTitleId: string | null;
   locationId: string | null;
   managerId: string | null;
+  shiftId: string | null;
+  biometricId: string | null;
   employmentType: string;
   employmentStatus: string;
   hireDate: Date;
@@ -153,6 +155,12 @@ export function EmployeeForm({ mode, id, initial = {}, options, section }: { mod
             </FormField>
             <FormField label="Reports to" name="managerId">
               <OptionSelect id="managerId" name="managerId" options={options.managers.filter((m) => m.id !== id)} selected={initial.managerId} placeholder="No manager" />
+            </FormField>
+            <FormField label="Work shift" name="shiftId" hint="Blank = company default shift">
+              <OptionSelect id="shiftId" name="shiftId" options={options.shifts ?? []} selected={initial.shiftId} placeholder="Default shift" />
+            </FormField>
+            <FormField label="Biometric ID" name="biometricId" hint="Enroll number on the fingerprint / face terminal">
+              <Input id="biometricId" name="biometricId" defaultValue={initial.biometricId ?? ""} inputMode="numeric" />
             </FormField>
             <FormField label="Employment type" name="employmentType">
               <Select id="employmentType" name="employmentType" defaultValue={initial.employmentType ?? "FULL_TIME"}>
@@ -316,6 +324,8 @@ function HiddenJob({ initial }: { initial: Initial }) {
       <Hidden name="jobTitleId" value={initial.jobTitleId} />
       <Hidden name="locationId" value={initial.locationId} />
       <Hidden name="managerId" value={initial.managerId} />
+      <Hidden name="shiftId" value={initial.shiftId} />
+      <Hidden name="biometricId" value={initial.biometricId} />
       <Hidden name="employmentType" value={initial.employmentType ?? "FULL_TIME"} />
       <Hidden name="employmentStatus" value={initial.employmentStatus ?? "ACTIVE"} />
       <Hidden name="terminationDate" value={d(initial.terminationDate)} />

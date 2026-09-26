@@ -4,5 +4,8 @@ export * from "./schemas/employee";
 export * from "./schemas/org";
 export * from "./schemas/leave";
 export * from "./schemas/qualification";
+export * from "./schemas/attendance";
 export * from "./leave-days";
+export * from "./dtr";
+export * from "./adms";
 export * from "./types";
