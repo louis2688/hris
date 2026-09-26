@@ -10,7 +10,7 @@ import {
   zonedParts,
   type SessionUser,
 } from "@hris/shared";
-import { visibleEmployeeIds } from "../authz";
+import { scopeWhere } from "../authz";
 import { dtrEmployeeSelect, dtrTotalsForMonth } from "./attendance";
 import { fullName } from "./employees";
 import { fmtDate } from "@/lib/utils";
@@ -83,9 +83,8 @@ function totalsOf(columns: Column[], rows: Record<string, Cell>[]) {
 }
 
 /** Employees the user may report on: everyone for HR/Admin, self + direct reports for managers. */
-async function scope(user: SessionUser, departmentId?: string): Promise<Prisma.EmployeeWhereInput> {
-  const ids = await visibleEmployeeIds(user);
-  return { deletedAt: null, ...(ids ? { id: { in: ids } } : {}), ...(departmentId ? { departmentId } : {}) };
+function scope(user: SessionUser, departmentId?: string): Prisma.EmployeeWhereInput {
+  return { deletedAt: null, ...scopeWhere(user), ...(departmentId ? { departmentId } : {}) };
 }
 
 // ---------- Reports ----------
@@ -96,7 +95,7 @@ async function headcount(user: SessionUser, p: URLSearchParams): Promise<Report>
   const to = f.to ?? f.today;
   // ponytail: grouped in JS; fine for a few thousand employees, switch to groupBy if it grows past that.
   const emps = await prisma.employee.findMany({
-    where: await scope(user, f.departmentId),
+    where: scope(user, f.departmentId),
     select: { employmentStatus: true, employmentType: true, hireDate: true, terminationDate: true, department: { select: { name: true } } },
   });
   const groups = new Map<string, { headcount: number; hires: number; separations: number }>();
@@ -133,7 +132,7 @@ async function leave(user: SessionUser, p: URLSearchParams): Promise<Report> {
   const f = parse(p);
   const year = f.year ?? Number(f.today.slice(0, 4));
   const [emps, types] = await Promise.all([
-    prisma.employee.findMany({ where: await scope(user, f.departmentId), orderBy: [{ lastName: "asc" }, { firstName: "asc" }], select: whoSelect }),
+    prisma.employee.findMany({ where: scope(user, f.departmentId), orderBy: [{ lastName: "asc" }, { firstName: "asc" }], select: whoSelect }),
     prisma.leaveType.findMany({ where: { isActive: true, ...(f.leaveTypeId ? { id: f.leaveTypeId } : {}) }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
   ]);
   const ids = emps.map((e) => e.id);
@@ -181,7 +180,7 @@ async function attendance(user: SessionUser, p: URLSearchParams): Promise<Report
   const f = parse(p);
   const month = f.month ?? f.today.slice(0, 7);
   const emps = await prisma.employee.findMany({
-    where: { ...(await scope(user, f.departmentId)), employmentStatus: { notIn: [...SEPARATED] } },
+    where: { ...scope(user, f.departmentId), employmentStatus: { notIn: [...SEPARATED] } },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     select: { ...whoSelect, ...dtrEmployeeSelect },
   });
@@ -224,7 +223,7 @@ async function timesheets(user: SessionUser, p: URLSearchParams): Promise<Report
     where: {
       date: { gte: new Date(from), lte: new Date(to) },
       ...(f.projectId ? { projectId: f.projectId } : {}),
-      timesheet: { ...(status ? { status } : {}), employee: await scope(user, f.departmentId) },
+      timesheet: { ...(status ? { status } : {}), employee: scope(user, f.departmentId) },
     },
     select: { hours: true, project: { select: { name: true, client: true } }, timesheet: { select: { employee: { select: whoSelect } } } },
   });
@@ -302,7 +301,7 @@ async function employees(user: SessionUser, p: URLSearchParams): Promise<Report>
   if (!cols.length) cols = EMPLOYEE_COLUMNS.filter((c) => DEFAULT_COLS.includes(c.key));
   const status = pick(EMPLOYMENT_STATUSES, f.status);
   const emps = await prisma.employee.findMany({
-    where: { ...(await scope(user, f.departmentId)), ...(status ? { employmentStatus: status } : {}), ...(f.locationId ? { locationId: f.locationId } : {}) },
+    where: { ...scope(user, f.departmentId), ...(status ? { employmentStatus: status } : {}), ...(f.locationId ? { locationId: f.locationId } : {}) },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     select: empSelect,
   });

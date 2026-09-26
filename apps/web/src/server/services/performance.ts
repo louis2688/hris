@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@hris/db";
+import { prisma, type Prisma } from "@hris/db";
 import { computeFinalRating, FINAL_RATING_SCALE, type KpiInput, type ReviewCycleInput, type ReviewFormInput, type SessionUser } from "@hris/shared";
 import { AuthError } from "../auth/session";
 import { isStaff } from "../authz";
@@ -92,9 +92,12 @@ export async function activateCycle(actor: SessionUser, id: string) {
 
   await audit(actor.id, "review_cycle.activate", "ReviewCycle", id, { after: { reviews: reviews.length } });
   const due = cycle.dueDate.toISOString().slice(0, 10);
-  // ponytail: sequential notify, fine for hundreds of employees; batch with createMany if headcount grows.
-  for (const r of reviews) {
-    await notify(employees.find((e) => e.id === r.employeeId)?.userId, `Performance review: ${cycle.name}`, `Please complete your self review by ${due}.`, `/performance/${r.id}`);
+  const userOf = new Map(employees.map((e) => [e.id, e.userId]));
+  // ponytail: notify() also emails (createMany would skip that), so 5 in flight at a time leaves pool room for other requests.
+  for (let i = 0; i < reviews.length; i += 5) {
+    await Promise.all(
+      reviews.slice(i, i + 5).map((r) => notify(userOf.get(r.employeeId), `Performance review: ${cycle.name}`, `Please complete your self review by ${due}.`, `/performance/${r.id}`)),
+    );
   }
   return { reviews: reviews.length };
 }
@@ -122,9 +125,9 @@ export const teamReviews = (u: SessionUser) =>
     include: { cycle: cycleLite, employee: person },
   });
 
-export const allReviews = (cycleId: string) =>
+export const allReviews = (where: Prisma.PerformanceReviewWhereInput) =>
   prisma.performanceReview.findMany({
-    where: { cycleId },
+    where,
     orderBy: [{ employee: { lastName: "asc" } }, { employee: { firstName: "asc" } }],
     include: { employee: person, reviewer: person },
   });

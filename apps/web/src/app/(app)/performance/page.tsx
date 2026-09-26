@@ -19,9 +19,16 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
   const user = await requireSession();
   const staff = isStaff(user);
   const sp = await searchParams;
-  const [mine, todo, cycles] = await Promise.all([user.employeeId ? myReviews(user.employeeId) : [], teamReviews(user), staff ? listCycles() : []]);
+  // Guess the cycle's reviews in the same wave as listCycles: ?cycle= if given, else every ACTIVE cycle (narrowed below).
+  const [mine, todo, cycles, guessed] = await Promise.all([
+    user.employeeId ? myReviews(user.employeeId) : [],
+    teamReviews(user),
+    staff ? listCycles() : [],
+    staff ? allReviews(sp.cycle ? { cycleId: sp.cycle } : { cycle: { status: "ACTIVE" } }) : [],
+  ]);
   const cycle = staff ? (cycles.find((c) => c.id === sp.cycle) ?? cycles.find((c) => c.status === "ACTIVE")) : undefined;
-  const all = cycle ? await allReviews(cycle.id) : [];
+  // ponytail: an unknown ?cycle= id falls back to the active cycle with a second query.
+  const all = !cycle ? [] : !sp.cycle || cycle.id === sp.cycle ? guessed.filter((r) => r.cycleId === cycle.id) : await allReviews({ cycleId: cycle.id });
   const waiting = todo.filter((r) => r.status === "MANAGER_REVIEW" && r.cycle.status === "ACTIVE").length;
 
   return (

@@ -59,12 +59,12 @@ export async function listEmployees(q: EmployeeListQuery, restrictTo: string[] |
   };
   const orderBy: Prisma.EmployeeOrderByWithRelationInput[] =
     q.sort === "code"
-      ? [{ employeeCode: q.dir }]
+      ? [{ employeeCode: q.dir }, { id: "asc" }]
       : q.sort === "hireDate"
-        ? [{ hireDate: q.dir }]
+        ? [{ hireDate: q.dir }, { id: "asc" }]
         : q.sort === "department"
-          ? [{ department: { name: q.dir } }, { lastName: "asc" }]
-          : [{ lastName: q.dir }, { firstName: q.dir }];
+          ? [{ department: { name: q.dir } }, { lastName: "asc" }, { id: "asc" }]
+          : [{ lastName: q.dir }, { firstName: q.dir }, { id: "asc" }];
 
   const [items, total] = await Promise.all([
     prisma.employee.findMany({ where, orderBy, skip: (q.page - 1) * q.pageSize, take: q.pageSize, select: employeeSummarySelect }),

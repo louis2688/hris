@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@hris/db";
+import { prisma, type Prisma } from "@hris/db";
 import type { SessionUser } from "@hris/shared";
 import { AuthError } from "./auth/session";
 
@@ -18,7 +18,17 @@ export async function assertAccessEmployee(u: SessionUser, employeeId: string) {
   if (!(await canAccessEmployee(u, employeeId))) throw new AuthError("Forbidden", 403);
 }
 
-/** Employee ids `u` may see in lists: null = everyone (staff). */
+/**
+ * Employees `u` may see in lists, as a filter for the same query (no pre-query): null = everyone (staff).
+ * Same rows as visibleEmployeeIds. Use as `where: { ...scopeWhere(u) }` or `employee: scopeWhere(u)`; don't spread next to another top-level OR.
+ */
+export function scopeWhere(u: SessionUser): Prisma.EmployeeWhereInput | null {
+  if (isStaff(u)) return null;
+  if (!u.employeeId) return { id: { in: [] } };
+  return { OR: [{ id: u.employeeId }, { managerId: u.employeeId, deletedAt: null }] };
+}
+
+/** Employee ids `u` may see in lists: null = everyone (staff). Prefer scopeWhere; this costs a round trip. */
 export async function visibleEmployeeIds(u: SessionUser): Promise<string[] | null> {
   if (isStaff(u)) return null;
   if (!u.employeeId) return [];
