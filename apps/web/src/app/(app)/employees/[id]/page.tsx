@@ -16,6 +16,7 @@ import { BalanceCards, LeaveRequestList } from "@/components/leave-widgets";
 import { EmployeeForm } from "../employee-form";
 import { loadFormOptions } from "../options";
 import { AccountPanel } from "./account-panel";
+import { QualTab } from "@/components/qual-tab";
 import { EntitlementEditor } from "./entitlement-editor";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -34,6 +35,7 @@ const TABS = [
   { key: "job", label: "Job" },
   { key: "contact", label: "Contact" },
   { key: "emergency", label: "Emergency" },
+  { key: "qualifications", label: "Qualifications" },
   { key: "leave", label: "Leave" },
   { key: "account", label: "Account" },
 ];
@@ -83,6 +85,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         <EmployeeForm mode="edit" id={e.id} initial={e} options={await loadFormOptions()} section={active} />
       ) : null}
       {active === "emergency" ? <EmergencyContacts employeeId={e.id} contacts={e.emergencyContacts} /> : null}
+      {active === "qualifications" ? <QualTab employeeId={e.id} /> : null}
       {active === "leave" ? <LeaveTab employeeId={e.id} staff={staff} /> : null}
       {active === "account" ? <AccountPanel employeeId={e.id} account={e.user} defaultEmail={e.workEmail ?? ""} isSelf={e.user?.id === user.id} isAdmin={user.role === "ADMIN"} /> : null}
     </div>
@@ -107,3 +110,4 @@ async function LeaveTab({ employeeId, staff }: { employeeId: string; staff: bool
     </div>
   );
 }
+

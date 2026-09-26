@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { isoDate } from "@/lib/utils";
 
 export type Option = { id: string; name: string };
-export type EmployeeFormOptions = { departments: Option[]; jobTitles: Option[]; locations: Option[]; managers: Option[] };
+export type EmployeeFormOptions = { departments: Option[]; jobTitles: Option[]; locations: Option[]; managers: Option[]; shifts?: Option[]; nationalities?: string[] };
 
 type Initial = Partial<{
   employeeCode: string;
@@ -124,7 +124,12 @@ export function EmployeeForm({ mode, id, initial = {}, options, section }: { mod
               </Select>
             </FormField>
             <FormField label="Nationality" name="nationality">
-              <Input id="nationality" name="nationality" defaultValue={initial.nationality ?? ""} />
+              <Input id="nationality" name="nationality" list="nationality-options" defaultValue={initial.nationality ?? ""} />
+              <datalist id="nationality-options">
+                {(options.nationalities ?? []).map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
             </FormField>
           </Section>
         ) : null}

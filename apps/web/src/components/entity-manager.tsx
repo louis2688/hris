@@ -35,6 +35,7 @@ export function EntityManager({
   deleteAction,
   deleteConfirm,
   extra,
+  hidden,
 }: {
   title: string;
   description?: string;
@@ -46,6 +47,8 @@ export function EntityManager({
   deleteAction?: (id: string) => Promise<ActionResult>;
   deleteConfirm?: string;
   extra?: React.ReactNode;
+  /** Fixed values posted with every save (e.g. a kind discriminator). */
+  hidden?: Record<string, string>;
 }) {
   const [editing, setEditing] = React.useState<Row | "new" | null>(null);
   const initial = editing && editing !== "new" ? editing.values : {};
@@ -106,6 +109,9 @@ export function EntityManager({
       <Dialog open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent title={editing === "new" ? `Add ${singular}` : `Edit ${singular}`}>
           <ActionForm key={id ?? "new"} action={saveAction.bind(null, id)} onSuccess={() => setEditing(null)}>
+            {Object.entries(hidden ?? {}).map(([k, v]) => (
+              <input key={k} type="hidden" name={k} value={v} />
+            ))}
             <div className="grid gap-4 sm:grid-cols-2">
               {fields.map((f) => (
                 <FieldInput key={f.name} f={f} value={initial[f.name]} />

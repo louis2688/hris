@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/settings/departments", label: "Departments" },
   { href: "/settings/job-titles", label: "Job titles" },
   { href: "/settings/locations", label: "Locations" },
+  { href: "/settings/qualifications", label: "Qualifications" },
   { href: "/settings/leave-types", label: "Leave types" },
   { href: "/settings/entitlements", label: "Entitlements" },
   { href: "/settings/holidays", label: "Holidays" },

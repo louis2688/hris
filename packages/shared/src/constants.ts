@@ -76,3 +76,11 @@ export type LeaveEventAction = (typeof LEAVE_EVENT_ACTIONS)[number];
 
 export const PAGE_SIZE_DEFAULT = 20;
 export const PAGE_SIZE_MAX = 100;
+
+export const QUALIFICATION_KINDS = ["SKILL", "LICENSE", "MEMBERSHIP"] as const;
+export type QualificationKind = (typeof QUALIFICATION_KINDS)[number];
+export const QUALIFICATION_LABELS: Record<QualificationKind, string> = { SKILL: "Skill", LICENSE: "License", MEMBERSHIP: "Membership" };
+
+export const APPROVER_KINDS = ["MANAGER", "HR", "ADMIN"] as const;
+export type ApproverKind = (typeof APPROVER_KINDS)[number];
+export const APPROVER_LABELS: Record<ApproverKind, string> = { MANAGER: "Direct manager", HR: "HR", ADMIN: "Administrator" };

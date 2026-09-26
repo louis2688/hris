@@ -73,6 +73,17 @@ async function main() {
     if (!existing) await prisma.holiday.create({ data: { name, date: d(date) } });
   }
 
+  // ---- Qualifications & nationalities ----
+  for (const name of ["Filipino", "American", "Australian", "British", "Canadian", "Chinese", "Indian", "Japanese", "Korean", "Singaporean"]) {
+    await prisma.nationality.upsert({ where: { name }, update: {}, create: { name } });
+  }
+  const quals: [("SKILL" | "LICENSE" | "MEMBERSHIP"), string][] = [
+    ["SKILL", "Java"], ["SKILL", "React"], ["SKILL", "Project Management"], ["SKILL", "Customer Service"], ["SKILL", "Accounting"],
+    ["LICENSE", "PRC - Certified Public Accountant"], ["LICENSE", "PRC - Registered Nurse"], ["LICENSE", "LTO Driver's License"], ["LICENSE", "PMP Certification"],
+    ["MEMBERSHIP", "PICPA"], ["MEMBERSHIP", "PMAP"], ["MEMBERSHIP", "PSITE"],
+  ];
+  for (const [kind, name] of quals) await prisma.qualification.upsert({ where: { kind_name: { kind, name } }, update: {}, create: { kind, name } });
+
   // ---- People ----
   type P = { code: string; first: string; last: string; email: string; role?: "ADMIN" | "HR" | "MANAGER" | "EMPLOYEE"; dept: string; title: string; loc?: string; manager?: string; hire: string; gender?: "MALE" | "FEMALE"; mobile?: string };
   const people: P[] = [

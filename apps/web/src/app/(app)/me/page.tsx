@@ -5,6 +5,7 @@ import { Card, CardBody, EmptyState, PageHeader } from "@/components/ui/card";
 import { ProfileHero, ProfileOverview, TabNav } from "@/components/profile";
 import { EmergencyContacts } from "@/components/emergency-contacts";
 import { SelfEditForm } from "./self-edit-form";
+import { QualTab } from "@/components/qual-tab";
 
 export const metadata: Metadata = { title: "My Info" };
 
@@ -12,6 +13,7 @@ const TABS = [
   { key: "overview", label: "Overview" },
   { key: "edit", label: "Edit contact details" },
   { key: "emergency", label: "Emergency contacts" },
+  { key: "qualifications", label: "Qualifications" },
 ];
 
 export default async function MePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
@@ -36,6 +38,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             <SelfEditForm e={e} />
           </CardBody>
         </Card>
+      ) : tab === "qualifications" ? (
+        <QualTab employeeId={e.id} />
       ) : tab === "emergency" ? (
         <EmergencyContacts employeeId={e.id} contacts={e.emergencyContacts} />
       ) : (
