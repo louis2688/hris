@@ -68,7 +68,10 @@ export function LeaveRequestList({ items, showEmployee = true, title, emptyText 
                     {r.startDayPart !== "FULL" || r.endDayPart !== "FULL" ? " · half day" : ""}
                   </p>
                 </div>
-                <LeaveStatusBadge status={r.status} />
+                <span className="flex flex-col items-end gap-0.5">
+                  <LeaveStatusBadge status={r.status} />
+                  {r.status === "PENDING" && r.approvalChain.length > 1 ? <span className="text-[10px] text-slate-500">Level {r.currentLevel + 1}/{r.approvalChain.length}</span> : null}
+                </span>
               </Link>
             </li>
           ))}

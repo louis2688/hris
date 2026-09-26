@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DAY_PART_LABELS } from "@hris/shared";
+import { APPROVER_LABELS, DAY_PART_LABELS } from "@hris/shared";
 import { requireSession } from "@/server/auth/session";
 import { canAccessEmployee, isStaff } from "@/server/authz";
 import { canDecide, getBalances, getLeaveRequest } from "@/server/services/leave";
@@ -80,7 +80,10 @@ export default async function LeaveRequestPage({ params }: { params: Promise<{ i
                   <div className="min-w-0 flex-1">
                     <p>
                       <span className="font-medium">{ev.actor?.employee ? fullName(ev.actor.employee) : ev.actor?.email ?? "System"}</span>{" "}
-                      <span className="text-slate-600">{ev.action.toLowerCase()}</span>
+                      <span className="text-slate-600">
+                        {ev.action.toLowerCase()}
+                        {ev.level && r.approvalChain.length > 1 ? ` (level ${ev.level})` : ""}
+                      </span>
                     </p>
                     {ev.note ? <p className="mt-0.5 whitespace-pre-line text-slate-700">{ev.note}</p> : null}
                     <p className="mt-0.5 text-xs text-slate-400">{fmtDateTime(ev.createdAt)}</p>
@@ -95,6 +98,33 @@ export default async function LeaveRequestPage({ params }: { params: Promise<{ i
         </div>
 
         <div className="space-y-6">
+          {r.approvalChain.length ? (
+            <Card>
+              <CardHeader title="Approval" description={`${r.approvalChain.length} level${r.approvalChain.length > 1 ? "s" : ""}`} />
+              <ol className="space-y-3 px-5 py-4">
+                {r.approvalChain.map((k, i) => {
+                  const done = r.status === "APPROVED" || i < r.currentLevel;
+                  const current = r.status === "PENDING" && i === r.currentLevel;
+                  const rejected = r.status === "REJECTED" && i === r.currentLevel;
+                  return (
+                    <li key={i} className="flex items-center gap-3 text-sm">
+                      <span
+                        className={
+                          "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold " +
+                          (done ? "bg-emerald-500 text-white" : rejected ? "bg-red-500 text-white" : current ? "bg-amber-100 text-amber-800 ring-2 ring-amber-300" : "bg-slate-100 text-slate-500")
+                        }
+                        aria-hidden
+                      >
+                        {done ? "✓" : rejected ? "✕" : i + 1}
+                      </span>
+                      <span className={current ? "font-medium" : "text-slate-600"}>{APPROVER_LABELS[k]}</span>
+                      <span className="ml-auto text-xs text-slate-500">{done ? "Approved" : rejected ? "Rejected" : current ? "Waiting" : r.status === "CANCELLED" ? "-" : "Next"}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </Card>
+          ) : null}
           {decide ? (
             <Card>
               <CardHeader title="Decision" description={balance ? `${balance.available} day(s) available after this request` : undefined} />

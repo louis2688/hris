@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DAY_PARTS, LEAVE_STATUSES, PAGE_SIZE_MAX } from "../constants";
+import { APPROVER_KINDS, DAY_PARTS, LEAVE_STATUSES, PAGE_SIZE_MAX } from "../constants";
 import { stripEmpty } from "./employee";
 
 const dateStr = z
@@ -7,7 +7,10 @@ const dateStr = z
   .min(1, "Required")
   .refine((v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)), "Use YYYY-MM-DD");
 
-export const leaveTypeSchema = z.object({
+const approverLevel = z.enum(APPROVER_KINDS).optional().or(z.literal("")).transform((v) => (v ? v : undefined));
+
+export const leaveTypeSchema = z
+  .object({
   name: z.string().trim().min(1, "Name is required").max(80),
   code: z
     .string()
@@ -22,7 +25,12 @@ export const leaveTypeSchema = z.object({
   defaultDays: z.coerce.number().min(0).max(365).default(0),
   maxConsecutiveDays: z.coerce.number().int().min(0).max(365).optional().or(z.literal("")).transform((v) => (v === "" || v === undefined ? undefined : Number(v))),
   isActive: z.boolean().default(true),
-});
+  level1: approverLevel,
+  level2: approverLevel,
+  level3: approverLevel,
+})
+  // Levels become an ordered chain; blanks and repeats are dropped.
+  .transform(({ level1, level2, level3, ...rest }) => ({ ...rest, approvalChain: [...new Set([level1, level2, level3].filter((x): x is NonNullable<typeof x> => !!x))] }));
 export type LeaveTypeInput = z.infer<typeof leaveTypeSchema>;
 
 export const leaveEntitlementSchema = z.object({

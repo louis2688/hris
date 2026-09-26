@@ -94,8 +94,17 @@ test("leave flow: employee requests, manager approves, balance updates", async (
   await expect(mp.getByText("E2E test trip").first()).toBeVisible();
   await mp.getByPlaceholder("Optional note for the employee").fill("Enjoy!");
   await mp.getByRole("button", { name: "Approve" }).click();
-  await expect(mp.getByText("Approved", { exact: true }).first()).toBeVisible();
+  // Vacation leave is two-level (manager then HR): still pending after the manager.
+  await expect(mp.getByText("Waiting").first()).toBeVisible();
   await expect(mp.getByText("Enjoy!").first()).toBeVisible();
+
+  const hr = await browser.newContext();
+  const hp = await hr.newPage();
+  await login(hp, USERS.hr);
+  await hp.goto(mp.url());
+  await hp.getByRole("button", { name: "Approve" }).click();
+  await expect(hp.getByText("Approved", { exact: true }).first()).toBeVisible();
+  await hr.close();
 
   // Employee sees approval + notification, balance moved from pending to used
   await ep.goto("/dashboard");

@@ -11,6 +11,7 @@ import {
   type LeaveTypeInput,
   type SessionUser,
 } from "@hris/shared";
+import type { ApproverKind } from "@hris/db";
 import { AuthError } from "../auth/session";
 import { isStaff } from "../authz";
 import { audit, notify } from "./audit";
@@ -36,6 +37,7 @@ export async function saveLeaveType(actor: SessionUser, d: LeaveTypeInput, id?: 
     defaultDays: d.defaultDays,
     maxConsecutiveDays: d.maxConsecutiveDays ?? null,
     isActive: d.isActive,
+    approvalChain: d.approvalChain,
   };
   try {
     const row = id ? await prisma.leaveType.update({ where: { id }, data }) : await prisma.leaveType.create({ data });
@@ -183,11 +185,31 @@ export async function getLeaveRequest(id: string) {
 
 export type LeaveRequestDetail = Awaited<ReturnType<typeof getLeaveRequest>>;
 
-/** Who may decide this request: the employee's manager, or HR/Admin. Never the requester. */
-export function canDecide(actor: SessionUser, r: { employeeId: string; employee: { managerId: string | null } }) {
+type Decidable = { employeeId: string; status?: string; approvalChain: ApproverKind[]; currentLevel: number; employee: { managerId: string | null } };
+
+/** Approver kind for the request's current level. Legacy rows with no chain behave as [MANAGER]. */
+export const currentApprover = (r: Pick<Decidable, "approvalChain" | "currentLevel">): ApproverKind => r.approvalChain[r.currentLevel] ?? "MANAGER";
+
+/**
+ * Who may act on the current level. Never the requester.
+ * MANAGER level: the direct manager (HR/Admin step in when there is no manager).
+ * HR level: HR or Admin. ADMIN level: Admin. Admin may always override.
+ */
+export function canDecide(actor: SessionUser, r: Decidable) {
   if (r.employeeId === actor.employeeId) return false;
-  if (isStaff(actor)) return true;
-  return actor.role === "MANAGER" && r.employee.managerId === actor.employeeId;
+  if (actor.role === "ADMIN") return true;
+  const kind = currentApprover(r);
+  if (kind === "MANAGER") return r.employee.managerId ? r.employee.managerId === actor.employeeId || actor.role === "HR" : actor.role === "HR";
+  if (kind === "HR") return actor.role === "HR";
+  return false;
+}
+
+/** Users to notify for a given approval level. */
+async function approverUserIds(kind: ApproverKind, managerUserId: string | null | undefined): Promise<string[]> {
+  if (kind === "MANAGER" && managerUserId) return [managerUserId];
+  const roles: ("HR" | "ADMIN")[] = kind === "ADMIN" ? ["ADMIN"] : ["HR", "ADMIN"];
+  const users = await prisma.user.findMany({ where: { role: { in: roles }, isActive: true }, select: { id: true } });
+  return users.map((u) => u.id);
 }
 
 export async function createLeaveRequest(actor: SessionUser, d: CreateLeaveRequestInput) {
@@ -220,7 +242,8 @@ export async function createLeaveRequest(actor: SessionUser, d: CreateLeaveReque
     throw new AppError(`Insufficient balance: ${balance.available} day(s) available, ${totalDays} requested`, "INSUFFICIENT_BALANCE");
   }
 
-  const autoApprove = !type.requiresApproval;
+  const chain: ApproverKind[] = type.requiresApproval ? (type.approvalChain.length ? type.approvalChain : ["MANAGER"]) : [];
+  const autoApprove = chain.length === 0;
   const request = await prisma.leaveRequest.create({
     data: {
       employeeId,
@@ -233,6 +256,8 @@ export async function createLeaveRequest(actor: SessionUser, d: CreateLeaveReque
       reason: d.reason ?? null,
       status: autoApprove ? "APPROVED" : "PENDING",
       decidedAt: autoApprove ? new Date() : null,
+      approvalChain: chain,
+      currentLevel: 0,
       events: {
         create: [
           { actorUserId: actor.id, action: "SUBMITTED", note: d.reason ?? null },
@@ -245,12 +270,9 @@ export async function createLeaveRequest(actor: SessionUser, d: CreateLeaveReque
 
   await audit(actor.id, "leave.create", "LeaveRequest", request.id, { after: request });
   if (!autoApprove) {
-    await notify(
-      employee.manager?.user?.id,
-      `Leave request from ${fullName(employee)}`,
-      `${type.name}: ${d.startDate} to ${d.endDate} (${totalDays} day${totalDays === 1 ? "" : "s"})`,
-      `/leave/${request.id}`,
-    );
+    for (const uid of await approverUserIds(chain[0]!, employee.manager?.user?.id)) {
+      await notify(uid, `Leave request from ${fullName(employee)}`, `${type.name}: ${d.startDate} to ${d.endDate} (${totalDays} day${totalDays === 1 ? "" : "s"})`, `/leave/${request.id}`);
+    }
   }
   return request;
 }
@@ -260,18 +282,29 @@ export async function decideLeaveRequest(actor: SessionUser, id: string, d: Deci
   if (!canDecide(actor, r)) throw new AuthError("You cannot decide this request", 403);
   if (r.status !== "PENDING") throw new AppError(`Request is already ${r.status.toLowerCase()}`);
 
-  const updated = await prisma.leaveRequest.update({
-    where: { id },
-    data: {
-      status: d.decision,
-      approverId: actor.employeeId,
-      decidedAt: new Date(),
-      decisionNote: d.note ?? null,
-      events: { create: { actorUserId: actor.id, action: d.decision, note: d.note ?? null } },
-    },
-    include: leaveRequestInclude,
+  const chain = r.approvalChain.length ? r.approvalChain : (["MANAGER"] as ApproverKind[]);
+  const level = r.currentLevel;
+  const advance = d.decision === "APPROVED" && level + 1 < chain.length;
+  // Optimistic lock on currentLevel so two approvers at the same level cannot both advance it.
+  const res = await prisma.leaveRequest.updateMany({
+    where: { id, status: "PENDING", currentLevel: level },
+    data: advance
+      ? { currentLevel: level + 1 }
+      : { status: d.decision, approverId: actor.employeeId, decidedAt: new Date(), decisionNote: d.note ?? null },
   });
-  await audit(actor.id, `leave.${d.decision.toLowerCase()}`, "LeaveRequest", id, { before: { status: r.status }, after: { status: d.decision, note: d.note } });
+  if (res.count === 0) throw conflict("Someone else just acted on this request. Refresh and try again.");
+  await prisma.leaveRequestEvent.create({ data: { requestId: id, actorUserId: actor.id, action: d.decision, level: level + 1, note: d.note ?? null } });
+  const updated = await getLeaveRequest(id);
+  await audit(actor.id, `leave.${d.decision.toLowerCase()}`, "LeaveRequest", id, { before: { status: r.status, level }, after: { status: updated.status, level: updated.currentLevel, note: d.note } });
+
+  if (advance) {
+    const next = chain[level + 1]!;
+    for (const uid of await approverUserIds(next, r.employee.manager?.user?.id)) {
+      if (uid !== actor.id) await notify(uid, `Leave request from ${fullName(r.employee)} needs ${next === "MANAGER" ? "manager" : next} approval`, `Level ${level + 2} of ${chain.length}`, `/leave/${id}`);
+    }
+    await notify(r.employee.user?.id, `Leave request approved at level ${level + 1} of ${chain.length}`, "Waiting for the next approver", `/leave/${id}`);
+    return updated;
+  }
   await notify(
     r.employee.user?.id,
     `Leave request ${d.decision.toLowerCase()}`,
@@ -321,12 +354,14 @@ export async function leaveInWindow(from: Date, to: Date, restrictTo: string[] |
   });
 }
 
+/** Requests whose *current* level the actor can decide. */
 export async function pendingApprovalsFor(actor: SessionUser) {
-  if (isStaff(actor)) return prisma.leaveRequest.findMany({ where: { status: "PENDING" }, include: leaveRequestInclude, orderBy: { createdAt: "asc" } });
-  if (!actor.employeeId) return [];
-  return prisma.leaveRequest.findMany({
-    where: { status: "PENDING", employee: { managerId: actor.employeeId } },
+  if (!isStaff(actor) && !actor.employeeId) return [];
+  // ponytail: filter levels in JS; push into SQL if pending volume ever gets large.
+  const rows = await prisma.leaveRequest.findMany({
+    where: { status: "PENDING", ...(isStaff(actor) ? {} : { employee: { managerId: actor.employeeId } }) },
     include: leaveRequestInclude,
     orderBy: { createdAt: "asc" },
   });
+  return rows.filter((r) => canDecide(actor, r));
 }

@@ -47,15 +47,22 @@ async function main() {
   const cebu = await prisma.location.upsert({ where: { name: "Cebu Office" }, update: {}, create: { name: "Cebu Office", city: "Cebu City", country: "Philippines", timezone: "Asia/Manila" } });
 
   // ---- Leave types ----
-  const lt = async (name: string, code: string, color: string, defaultDays: number, extra: Partial<{ isPaid: boolean; requiresApproval: boolean; allowHalfDay: boolean; maxConsecutiveDays: number; sortOrder: number }> = {}) =>
+  const lt = async (name: string, code: string, color: string, defaultDays: number, extra: Partial<{ isPaid: boolean; requiresApproval: boolean; allowHalfDay: boolean; maxConsecutiveDays: number; sortOrder: number; approvalChain: ("MANAGER" | "HR" | "ADMIN")[] }> = {}) =>
     prisma.leaveType.upsert({ where: { code }, update: { name, color, defaultDays, ...extra }, create: { name, code, color, defaultDays, ...extra } });
-  const VL = await lt("Vacation Leave", "VL", "#2563eb", 15, { sortOrder: 1 });
+  const VL = await lt("Vacation Leave", "VL", "#2563eb", 15, { sortOrder: 1, approvalChain: ["MANAGER", "HR"] });
   const SL = await lt("Sick Leave", "SL", "#dc2626", 15, { sortOrder: 2 });
   const EL = await lt("Emergency Leave", "EL", "#f59e0b", 3, { sortOrder: 3, allowHalfDay: false });
-  await lt("Maternity Leave", "ML", "#db2777", 0, { sortOrder: 4, allowHalfDay: false, maxConsecutiveDays: 105 });
+  await lt("Maternity Leave", "ML", "#db2777", 0, { sortOrder: 4, allowHalfDay: false, maxConsecutiveDays: 105, approvalChain: ["MANAGER", "HR", "ADMIN"] });
   await lt("Paternity Leave", "PL", "#7c3aed", 0, { sortOrder: 5, allowHalfDay: false, maxConsecutiveDays: 7 });
   await lt("Unpaid Leave", "UL", "#64748b", 0, { sortOrder: 6, isPaid: false });
   await lt("Work From Home", "WFH", "#0d9488", 0, { sortOrder: 7, isPaid: false, requiresApproval: false });
+
+  // ---- Shifts & projects ----
+  await prisma.workShift.upsert({ where: { name: "Regular 9-6" }, update: {}, create: { name: "Regular 9-6", startTime: "09:00", endTime: "18:00", breakMinutes: 60, graceMinutes: 10, isDefault: true } });
+  await prisma.workShift.upsert({ where: { name: "Night 10pm-7am" }, update: {}, create: { name: "Night 10pm-7am", startTime: "22:00", endTime: "07:00", breakMinutes: 60, graceMinutes: 10 } });
+  for (const [name, client] of [["Internal", null], ["HRIS Platform", "Internal"], ["Client Portal", "Acme Corp"]] as const) {
+    await prisma.project.upsert({ where: { name }, update: {}, create: { name, client } });
+  }
 
   // ---- PH regular holidays (nationwide) ----
   const holidays: [string, string][] = [
