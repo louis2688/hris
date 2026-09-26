@@ -1,0 +1,25 @@
+{
+  "name": "hris",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:generate": "pnpm --filter @hris/db generate",
+    "db:migrate": "pnpm --filter @hris/db migrate:deploy",
+    "db:migrate:dev": "pnpm --filter @hris/db migrate:dev",
+    "db:seed": "pnpm --filter @hris/db seed",
+    "db:studio": "pnpm --filter @hris/db studio",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.3",
+    "typescript": "^5.9.3"
+  }
+}

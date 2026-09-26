@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  /* ponytail: system font stack, no webfont download. Add next/font/local if brand type matters. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --color-brand-50: #eef6ff;
+  --color-brand-100: #d9eaff;
+  --color-brand-200: #bcdbff;
+  --color-brand-300: #8ec4ff;
+  --color-brand-400: #59a3ff;
+  --color-brand-500: #337eff;
+  --color-brand-600: #1b5ef5;
+  --color-brand-700: #1449e1;
+  --color-brand-800: #173cb6;
+  --color-brand-900: #19378f;
+  --color-brand-950: #142357;
+
+  --color-surface: #f6f7f9;
+  --color-ink: #0f172a;
+}
+
+@layer base {
+  * {
+    @apply border-slate-200;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-surface text-ink antialiased;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.6;
+  }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}

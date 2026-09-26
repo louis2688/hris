@@ -1,0 +1,351 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  runtime  = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Enums ----------
+
+enum Role {
+  ADMIN
+  HR
+  MANAGER
+  EMPLOYEE
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  PROBATION
+  ON_LEAVE
+  SUSPENDED
+  RESIGNED
+  TERMINATED
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNDISCLOSED
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum DayPart {
+  FULL
+  AM
+  PM
+}
+
+enum LeaveEventAction {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMMENTED
+}
+
+// ---------- Identity ----------
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(EMPLOYEE)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  employee      Employee?
+  refreshTokens RefreshToken[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  leaveEvents   LeaveRequestEvent[]
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------- Organisation ----------
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String?  @unique
+  headId    String?
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  head      Employee?    @relation("DepartmentHead", fields: [headId], references: [id], onDelete: SetNull)
+  parent    Department?  @relation("DepartmentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Department[] @relation("DepartmentTree")
+  employees Employee[]
+}
+
+model JobTitle {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employees Employee[]
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  address   String?
+  city      String?
+  country   String?
+  timezone  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employees Employee[]
+  holidays  Holiday[]
+}
+
+model Holiday {
+  id         String   @id @default(cuid())
+  name       String
+  date       DateTime @db.Date
+  locationId String?
+  createdAt  DateTime @default(now())
+
+  location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([date, locationId])
+  @@index([date])
+}
+
+// ---------- People ----------
+
+model Employee {
+  id            String  @id @default(cuid())
+  employeeCode  String  @unique
+  userId        String? @unique
+
+  // Personal
+  firstName     String
+  middleName    String?
+  lastName      String
+  preferredName String?
+  gender        Gender         @default(UNDISCLOSED)
+  dateOfBirth   DateTime?      @db.Date
+  maritalStatus MaritalStatus?
+  nationality   String?
+  avatarUrl     String?
+
+  // Contact
+  workEmail     String?
+  personalEmail String?
+  phone         String?
+  mobile        String?
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  state         String?
+  postalCode    String?
+  country       String?
+
+  // Job
+  departmentId     String?
+  jobTitleId       String?
+  locationId       String?
+  managerId        String?
+  employmentType   EmploymentType   @default(FULL_TIME)
+  employmentStatus EmploymentStatus @default(ACTIVE)
+  hireDate         DateTime         @db.Date
+  terminationDate  DateTime?        @db.Date
+  notes            String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  jobTitle   JobTitle?   @relation(fields: [jobTitleId], references: [id], onDelete: SetNull)
+  location   Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  manager    Employee?   @relation("ReportsTo", fields: [managerId], references: [id], onDelete: SetNull)
+  reports    Employee[]  @relation("ReportsTo")
+
+  headOfDepartments Department[]       @relation("DepartmentHead")
+  emergencyContacts EmergencyContact[]
+  leaveEntitlements LeaveEntitlement[]
+  leaveRequests     LeaveRequest[]
+  approvedRequests  LeaveRequest[]     @relation("LeaveApprover")
+
+  @@index([lastName, firstName])
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([employmentStatus])
+}
+
+model EmergencyContact {
+  id           String  @id @default(cuid())
+  employeeId   String
+  name         String
+  relationship String
+  phone        String
+  isPrimary    Boolean @default(false)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+// ---------- Leave ----------
+
+model LeaveType {
+  id                 String   @id @default(cuid())
+  name               String   @unique
+  code               String   @unique
+  color              String   @default("#2563eb")
+  isPaid             Boolean  @default(true)
+  requiresApproval   Boolean  @default(true)
+  allowHalfDay       Boolean  @default(true)
+  defaultDays        Decimal  @default(0) @db.Decimal(5, 2)
+  maxConsecutiveDays Int?
+  isActive           Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  entitlements LeaveEntitlement[]
+  requests     LeaveRequest[]
+}
+
+model LeaveEntitlement {
+  id           String   @id @default(cuid())
+  employeeId   String
+  leaveTypeId  String
+  year         Int
+  entitledDays Decimal  @db.Decimal(5, 2)
+  carriedOver  Decimal  @default(0) @db.Decimal(5, 2)
+  adjustment   Decimal  @default(0) @db.Decimal(5, 2)
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([year])
+}
+
+model LeaveRequest {
+  id           String      @id @default(cuid())
+  employeeId   String
+  leaveTypeId  String
+  startDate    DateTime    @db.Date
+  endDate      DateTime    @db.Date
+  startDayPart DayPart     @default(FULL)
+  endDayPart   DayPart     @default(FULL)
+  totalDays    Decimal     @db.Decimal(5, 2)
+  reason       String?
+  status       LeaveStatus @default(PENDING)
+  approverId   String?
+  decidedAt    DateTime?
+  decisionNote String?
+  cancelledAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  employee  Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType LeaveType           @relation(fields: [leaveTypeId], references: [id])
+  approver  Employee?           @relation("LeaveApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  events    LeaveRequestEvent[]
+
+  @@index([employeeId, status])
+  @@index([status, createdAt])
+  @@index([startDate, endDate])
+}
+
+model LeaveRequestEvent {
+  id          String           @id @default(cuid())
+  requestId   String
+  actorUserId String?
+  action      LeaveEventAction
+  note        String?
+  createdAt   DateTime         @default(now())
+
+  request LeaveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actor   User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+}
+
+// ---------- Platform ----------
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entity      String
+  entityId    String?
+  before      Json?
+  after       Json?
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
