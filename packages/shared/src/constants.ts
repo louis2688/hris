@@ -104,3 +104,17 @@ export type TimesheetStatus = (typeof TIMESHEET_STATUSES)[number];
 
 export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 export const DEFAULT_TIMEZONE = "Asia/Manila";
+
+export const CANDIDATE_STAGES = ["APPLIED", "SHORTLISTED", "INTERVIEW", "OFFERED", "HIRED", "REJECTED", "WITHDRAWN"] as const;
+export type CandidateStage = (typeof CANDIDATE_STAGES)[number];
+export const CANDIDATE_STAGE_LABELS: Record<CandidateStage, string> = {
+  APPLIED: "Applied",
+  SHORTLISTED: "Shortlisted",
+  INTERVIEW: "Interview",
+  OFFERED: "Offered",
+  HIRED: "Hired",
+  REJECTED: "Rejected",
+  WITHDRAWN: "Withdrawn",
+};
+export const VACANCY_STATUSES = ["DRAFT", "OPEN", "CLOSED"] as const;
+export const INTERVIEW_RESULTS = ["PENDING", "PASSED", "FAILED"] as const;
