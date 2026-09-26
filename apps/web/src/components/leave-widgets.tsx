@@ -9,7 +9,7 @@ import { fmtDate, fmtDays, fullName } from "@/lib/utils";
 export function BalanceCards({ balances }: { balances: LeaveBalance[] }) {
   if (balances.length === 0) return <p className="text-sm text-slate-500">No leave types configured yet.</p>;
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {balances.map((b) => {
         const total = b.entitled + b.carriedOver + b.adjustment;
         const pct = total > 0 ? Math.min(100, Math.round(((b.used + b.pending) / total) * 100)) : 0;

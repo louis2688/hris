@@ -10,16 +10,16 @@ export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTab
   );
 }
 export const THead = ({ className, ...p }: React.HTMLAttributes<HTMLTableSectionElement>) => (
-  <thead className={cn("bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500", className)} {...p} />
+  <thead className={cn("bg-slate-50/80 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500", className)} {...p} />
 );
 export const TBody = ({ className, ...p }: React.HTMLAttributes<HTMLTableSectionElement>) => <tbody className={cn("divide-y divide-slate-100", className)} {...p} />;
-export const TR = ({ className, ...p }: React.HTMLAttributes<HTMLTableRowElement>) => <tr className={cn("hover:bg-slate-50/60", className)} {...p} />;
+export const TR = ({ className, ...p }: React.HTMLAttributes<HTMLTableRowElement>) => <tr className={cn("transition-colors hover:bg-brand-50/40", className)} {...p} />;
 export const TH = ({ className, ...p }: React.ThHTMLAttributes<HTMLTableCellElement>) => <th className={cn("px-4 py-2.5 font-medium", className)} {...p} />;
 export const TD = ({ className, ...p }: React.TdHTMLAttributes<HTMLTableCellElement>) => <td className={cn("px-4 py-3 align-middle text-slate-700", className)} {...p} />;
 
 export function Pagination({ page, totalPages, total, makeHref }: { page: number; totalPages: number; total: number; makeHref: (page: number) => string }) {
   if (totalPages <= 1) return <p className="px-4 py-3 text-xs text-slate-500">{total} result{total === 1 ? "" : "s"}</p>;
-  const btn = "rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 aria-disabled:pointer-events-none aria-disabled:opacity-40";
+  const btn = "rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50 aria-disabled:pointer-events-none aria-disabled:opacity-40";
   return (
     <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
       <p className="text-xs text-slate-500">

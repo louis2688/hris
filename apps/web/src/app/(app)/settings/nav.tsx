@@ -20,7 +20,7 @@ export function SettingsNav() {
       <ul className="flex gap-1 lg:flex-col">
         {ITEMS.map((i) => (
           <li key={i.href}>
-            <Link href={i.href} className={cn("block whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium", p.startsWith(i.href) ? "bg-white text-brand-700 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:bg-white/60")}>
+            <Link href={i.href} className={cn("block whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition-colors", p.startsWith(i.href) ? "bg-white text-brand-700 shadow-card ring-1 ring-slate-900/[0.06]" : "text-slate-600 hover:bg-white/70")}>
               {i.label}
             </Link>
           </li>

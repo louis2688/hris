@@ -63,7 +63,7 @@ export function ActionForm<T>({
       <form ref={formRef} action={formAction} className={cn("space-y-4", className)} noValidate>
         {children}
         {state && !state.ok && !state.fieldErrors ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+          <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-100" role="alert">
             {state.error}
           </p>
         ) : null}
@@ -106,11 +106,11 @@ export function FormField({
       </label>
       {children}
       {err ? (
-        <p className="mt-1 text-xs text-red-600" role="alert">
+        <p className="mt-1.5 text-xs font-medium text-red-600" role="alert">
           {err}
         </p>
       ) : hint ? (
-        <p className="mt-1 text-xs text-slate-500">{hint}</p>
+        <p className="mt-1.5 text-xs text-slate-500">{hint}</p>
       ) : null}
     </div>
   );

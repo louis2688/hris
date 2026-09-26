@@ -7,7 +7,7 @@ export function Avatar({ first, last, src, size = "md", className }: { first: st
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt={`${first} ${last}`} className={cn("shrink-0 rounded-full object-cover", sizes[size], className)} />
   ) : (
-    <span className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-800", sizes[size], className)} aria-hidden>
+    <span className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-100 to-brand-200 font-semibold text-brand-800", sizes[size], className)} aria-hidden>
       {initials(first, last)}
     </span>
   );

@@ -1,23 +1,49 @@
 @import "tailwindcss";
+@import "@fontsource-variable/plus-jakarta-sans";
 
+/*
+  Design tokens (ui-ux-pro-max "SaaS boutique" direction, light-first):
+  navy ink for text and sidebar, electric blue accent with a soft gradient on
+  primary actions, green for positive states, generous radii, subtle motion.
+*/
 @theme {
-  /* ponytail: system font stack, no webfont download. Add next/font/local if brand type matters. */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  --color-brand-50: #eef6ff;
-  --color-brand-100: #d9eaff;
-  --color-brand-200: #bcdbff;
-  --color-brand-300: #8ec4ff;
-  --color-brand-400: #59a3ff;
-  --color-brand-500: #337eff;
-  --color-brand-600: #1b5ef5;
-  --color-brand-700: #1449e1;
-  --color-brand-800: #173cb6;
-  --color-brand-900: #19378f;
-  --color-brand-950: #142357;
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe6ff;
+  --color-brand-200: #bfd2ff;
+  --color-brand-300: #93b4ff;
+  --color-brand-400: #4d7cff;
+  --color-brand-500: #0052ff;
+  --color-brand-600: #0047e0;
+  --color-brand-700: #003bba;
+  --color-brand-800: #003296;
+  --color-brand-900: #052a73;
+  --color-brand-950: #061a47;
 
-  --color-surface: #f6f7f9;
+  --color-surface: #f5f7fb;
   --color-ink: #0f172a;
+  --color-ink-muted: #475569;
+
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
+  --shadow-float: 0 12px 32px -12px rgb(15 23 42 / 0.25);
+
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-up: fade-up 0.35s var(--ease-spring) both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 @layer base {
@@ -26,15 +52,58 @@
   }
   html {
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
   body {
     @apply bg-surface text-ink antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
   }
   input[type="date"]::-webkit-calendar-picker-indicator {
-    opacity: 0.6;
+    opacity: 0.55;
+  }
+  a,
+  button,
+  [role="button"] {
+    @apply cursor-pointer;
+  }
+  ::selection {
+    @apply bg-brand-100 text-brand-900;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @utility scrollbar-thin {
   scrollbar-width: thin;
+}
+
+/* Staggered entrance for lists and card grids. Add `stagger` to the parent. */
+@utility stagger {
+  & > * {
+    animation: var(--animate-fade-up);
+  }
+  & > *:nth-child(2) { animation-delay: 40ms; }
+  & > *:nth-child(3) { animation-delay: 80ms; }
+  & > *:nth-child(4) { animation-delay: 120ms; }
+  & > *:nth-child(5) { animation-delay: 160ms; }
+  & > *:nth-child(6) { animation-delay: 200ms; }
+  & > *:nth-child(n + 7) { animation-delay: 240ms; }
+}
+
+@utility glass {
+  background: rgb(255 255 255 / 0.72);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
 }

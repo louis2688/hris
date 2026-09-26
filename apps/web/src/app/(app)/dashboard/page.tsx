@@ -5,7 +5,8 @@ import { EMPLOYMENT_STATUS_LABELS } from "@hris/shared";
 import { requireSession } from "@/server/auth/session";
 import { isStaff } from "@/server/authz";
 import { dashboardStats } from "@/server/services/dashboard";
-import { getBalances } from "@/server/services/leave";
+import { getBalances, pendingApprovalsFor } from "@/server/services/leave";
+import { LeaveRequestList } from "@/components/leave-widgets";
 import { markNotificationsReadAction } from "@/server/actions/leave";
 import { Card, CardBody, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
@@ -19,7 +20,11 @@ export default async function DashboardPage() {
   const user = await requireSession();
   const staff = isStaff(user);
   const manager = user.role === "MANAGER" || staff;
-  const [s, balances] = await Promise.all([dashboardStats(user), user.employeeId ? getBalances(user.employeeId, new Date().getUTCFullYear()) : Promise.resolve([])]);
+  const [s, balances, pending] = await Promise.all([
+    dashboardStats(user),
+    user.employeeId ? getBalances(user.employeeId, new Date().getUTCFullYear()) : Promise.resolve([]),
+    user.role === "EMPLOYEE" ? Promise.resolve([]) : pendingApprovalsFor(user),
+  ]);
   const active = s.byStatus.find((b) => b.employmentStatus === "ACTIVE")?._count._all ?? 0;
   const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening";
 
@@ -35,7 +40,7 @@ export default async function DashboardPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {manager ? (
           <>
             <Stat label={staff ? "Headcount" : "Team size"} value={s.headcount} hint={`${active} active`} icon={<Users />} />
@@ -52,18 +57,16 @@ export default async function DashboardPage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          {manager && s.pending > 0 ? (
-            <Card>
-              <CardHeader
-                title="Pending approvals"
-                description="Requests waiting for a decision"
-                action={
-                  <Link href="/leave?status=PENDING" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                    Review all
-                  </Link>
-                }
-              />
-            </Card>
+          {manager && pending.length > 0 ? (
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-700">Pending approvals ({pending.length})</h2>
+                <Link href="/leave?status=PENDING" className="text-sm font-medium text-brand-600 hover:underline">
+                  Review all
+                </Link>
+              </div>
+              <LeaveRequestList items={pending.slice(0, 5)} emptyText="Nothing waiting." />
+            </div>
           ) : null}
 
           <Card>

@@ -8,12 +8,13 @@ import { cn, fmtDate, fullName } from "@/lib/utils";
 
 export function ProfileHero({ e, actions }: { e: EmployeeDetail; actions?: React.ReactNode }) {
   return (
-    <Card className="mb-6">
-      <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <Avatar first={e.firstName} last={e.lastName} src={e.avatarUrl} size="xl" />
+    <Card className="mb-6 overflow-hidden">
+      <div className="h-20 bg-gradient-to-r from-brand-500 via-brand-400 to-sky-300" aria-hidden />
+      <CardBody className="-mt-10 flex flex-col gap-4 sm:flex-row sm:items-end">
+        <Avatar first={e.firstName} last={e.lastName} src={e.avatarUrl} size="xl" className="ring-4 ring-white shadow-card" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight">{fullName(e)}</h1>
+            <h1 className="text-xl font-bold tracking-tight">{fullName(e)}</h1>
             <EmploymentStatusBadge status={e.employmentStatus} />
           </div>
           <p className="mt-0.5 text-sm text-slate-600">
@@ -34,14 +35,14 @@ export function ProfileHero({ e, actions }: { e: EmployeeDetail; actions?: React
 export function TabNav({ base, tabs, active }: { base: string; tabs: { key: string; label: string }[]; active: string }) {
   return (
     <nav className="mb-6 -mx-4 overflow-x-auto px-4 scrollbar-thin lg:mx-0 lg:px-0" aria-label="Sections">
-      <ul className="flex gap-1 border-b border-slate-200">
+      <ul className="inline-flex gap-1 rounded-xl bg-slate-200/60 p-1">
         {tabs.map((t) => (
           <li key={t.key}>
             <Link
               href={t.key === tabs[0]?.key ? base : `${base}?tab=${t.key}`}
               className={cn(
-                "-mb-px inline-block whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium",
-                active === t.key ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800",
+                "inline-block whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                active === t.key ? "bg-white text-ink shadow-card" : "text-slate-600 hover:text-ink",
               )}
               aria-current={active === t.key ? "page" : undefined}
             >
@@ -72,7 +73,7 @@ const cap = (s: string | null | undefined) => (s ? s.charAt(0) + s.slice(1).toLo
 export function ProfileOverview({ e, showLinks }: { e: EmployeeDetail; showLinks?: boolean }) {
   const mgr = e.manager ? (showLinks ? <Link href={`/employees/${e.manager.id}`} className="text-brand-700 hover:underline">{fullName(e.manager)}</Link> : fullName(e.manager)) : null;
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="stagger grid gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader title="Personal" />
         <CardBody>
