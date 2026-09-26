@@ -1,5 +1,7 @@
 import "server-only";
+import { after } from "next/server";
 import { prisma, type Prisma } from "@hris/db";
+import { renderEmail, sendMail } from "../mail";
 
 export async function audit(
   actorUserId: string | null,
@@ -31,5 +33,26 @@ export async function notify(userId: string | null | undefined, title: string, b
     await prisma.notification.create({ data: { userId, title, body, link } });
   } catch (e) {
     console.error("notify failed", e);
+  }
+  // after() keeps the serverless fn alive past the response; it throws outside a request scope (scripts), so await there.
+  try {
+    after(() => emailUser(userId, title, body, link));
+  } catch {
+    await emailUser(userId, title, body, link);
+  }
+}
+
+/** Email a notification. Opt out per user: AppSetting { key: "email:<userId>", value: false }. */
+async function emailUser(userId: string, title: string, body?: string, link?: string) {
+  if (!process.env.SMTP_URL) return;
+  try {
+    const [user, optOut] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, select: { email: true, isActive: true } }),
+      prisma.appSetting.findUnique({ where: { key: `email:${userId}` } }),
+    ]);
+    if (!user?.isActive || optOut?.value === false) return;
+    await sendMail({ to: user.email, subject: title, ...renderEmail(title, body, link) });
+  } catch (e) {
+    console.error("notify email failed", e);
   }
 }
