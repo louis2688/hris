@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { EMPLOYMENT_STATUSES, EMPLOYMENT_STATUS_LABELS } from "@hris/shared";
 import { gate } from "@/server/auth/session";
 import { isStaff } from "@/server/authz";
-import { listDepartments, listLocations } from "@/server/services/org";
+import { departmentOptions, listLocations } from "@/server/services/org";
 import { EMPLOYEE_COLUMNS, REPORTS, searchToParams } from "@/server/services/reports";
 import { DepartmentFilter, ReportFilter, ReportTable } from "@/components/report-table";
 import { Checkbox, Select } from "@/components/ui/input";
@@ -13,7 +13,7 @@ export default async function EmployeeReportPage({ searchParams }: { searchParam
   const user = await gate("MANAGER", "HR", "ADMIN");
   const params = searchToParams(await searchParams);
   const staff = isStaff(user);
-  const [report, departments, locations] = await Promise.all([REPORTS.employees(user, params), staff ? listDepartments() : [], staff ? listLocations() : []]);
+  const [report, departments, locations] = await Promise.all([REPORTS.employees(user, params), staff ? departmentOptions() : [], staff ? listLocations() : []]);
   const f = report.filters;
   const picked = new Set(f.cols!.split(","));
   return (

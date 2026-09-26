@@ -1,5 +1,6 @@
 import "server-only";
-import { prisma } from "@hris/db";
+import { cache } from "react";
+import { prisma, type Prisma } from "@hris/db";
 import {
   addDaysIso,
   attendanceSlot,
@@ -17,17 +18,27 @@ import {
 } from "@hris/shared";
 import { audit } from "./audit";
 import { AppError, conflict, notFound } from "./errors";
+import { employeeHolidayWhere } from "./org";
 import { getSetting } from "./settings";
 
-export async function employeeClock(employeeId: string): Promise<{ shift: ShiftRule & { name: string }; timeZone: string }> {
-  const e = await prisma.employee.findUnique({ where: { id: employeeId }, select: { shift: true, location: { select: { timezone: true } } } });
+type ShiftRow = { name: string; startTime: string; endTime: string; breakMinutes: number; graceMinutes: number; workDays: number[] };
+const toClock = (shift: ShiftRow | null, timezone: string | null | undefined) => ({
+  shift: shift ? { name: shift.name, startTime: shift.startTime, endTime: shift.endTime, breakMinutes: shift.breakMinutes, graceMinutes: shift.graceMinutes, workDays: shift.workDays } : { name: "Standard", ...DEFAULT_SHIFT },
+  timeZone: timezone || DEFAULT_TIMEZONE,
+});
+
+const defaultShift = cache(() => prisma.workShift.findFirst({ where: { isDefault: true } }));
+
+/** Cached per request: the attendance page asks for it twice (DTR + today). */
+export const employeeClock = cache(async (employeeId: string): Promise<{ shift: ShiftRule & { name: string }; timeZone: string }> => {
+  // ponytail: default shift fetched in parallel even when unused; one extra tiny query beats a second round trip.
+  const [e, def] = await Promise.all([
+    prisma.employee.findUnique({ where: { id: employeeId }, select: { shift: true, location: { select: { timezone: true } } } }),
+    defaultShift(),
+  ]);
   if (!e) throw notFound("Employee");
-  const shift = e.shift ?? (await prisma.workShift.findFirst({ where: { isDefault: true } }));
-  return {
-    shift: shift ? { name: shift.name, startTime: shift.startTime, endTime: shift.endTime, breakMinutes: shift.breakMinutes, graceMinutes: shift.graceMinutes, workDays: shift.workDays } : { name: "Standard", ...DEFAULT_SHIFT },
-    timeZone: e.location?.timezone || DEFAULT_TIMEZONE,
-  };
-}
+  return toClock(e.shift ?? def, e.location?.timezone);
+});
 
 /** Punches for the attendance day that `now` falls in. */
 export async function todaysPunches(employeeId: string, now = new Date()) {
@@ -100,26 +111,17 @@ export async function punchPhoto(id: string) {
   return prisma.attendancePunch.findUnique({ where: { id }, select: { employeeId: true, photo: true } });
 }
 
-/** Full DTR for one employee and month (YYYY-MM). */
-export async function dtrForMonth(employeeId: string, month: string) {
-  const { shift, timeZone } = await employeeClock(employeeId);
+function monthWindow(month: string, shift: ShiftRule, timeZone: string) {
   const days = monthDays(month);
   const first = days[0]!;
   const last = days.at(-1)!;
   const from = new Date(zonedToUtc(first, shift.startTime, timeZone).getTime() - 4 * 3600_000);
   const to = new Date(zonedToUtc(addDaysIso(last, 1), shift.startTime, timeZone).getTime() - 4 * 3600_000);
+  return { days, first, last, from, to };
+}
 
-  const [punches, holidays, leaves] = await Promise.all([
-    prisma.attendancePunch.findMany({ where: { employeeId, at: { gte: from, lt: to } }, orderBy: { at: "asc" } }),
-    prisma.employee.findUnique({ where: { id: employeeId }, select: { locationId: true } }).then((e) =>
-      prisma.holiday.findMany({ where: { date: { gte: new Date(first), lte: new Date(last) }, OR: [{ locationId: null }, ...(e?.locationId ? [{ locationId: e.locationId }] : [])] } }),
-    ),
-    prisma.leaveRequest.findMany({
-      where: { employeeId, status: "APPROVED", startDate: { lte: new Date(last) }, endDate: { gte: new Date(first) } },
-      include: { leaveType: { select: { code: true } } },
-    }),
-  ]);
-
+type LeaveRow = { startDate: Date; endDate: Date; startDayPart: string; endDayPart: string; leaveType: { code: string } };
+function leaveMapOf(leaves: LeaveRow[]) {
   const leaveMap = new Map<string, { code: string; days: number }>();
   for (const l of leaves) {
     const s = l.startDate.toISOString().slice(0, 10);
@@ -129,6 +131,23 @@ export async function dtrForMonth(employeeId: string, month: string) {
       leaveMap.set(d, { code: l.leaveType.code, days: half ? 0.5 : 1 });
     }
   }
+  return leaveMap;
+}
+
+const approvedLeaveWhere = (first: string, last: string) => ({ status: "APPROVED" as const, startDate: { lte: new Date(last) }, endDate: { gte: new Date(first) } });
+
+/** Full DTR for one employee and month (YYYY-MM). */
+export async function dtrForMonth(employeeId: string, month: string) {
+  const { shift, timeZone } = await employeeClock(employeeId);
+  const { days, first, last, from, to } = monthWindow(month, shift, timeZone);
+
+  const [punches, holidays, leaves, photoIds] = await Promise.all([
+    prisma.attendancePunch.findMany({ where: { employeeId, at: { gte: from, lt: to } }, orderBy: { at: "asc" } }),
+    prisma.holiday.findMany({ where: { date: { gte: new Date(first), lte: new Date(last) }, ...employeeHolidayWhere(employeeId) } }),
+    prisma.leaveRequest.findMany({ where: { employeeId, ...approvedLeaveWhere(first, last) }, include: { leaveType: { select: { code: true } } } }),
+    prisma.attendancePunch.findMany({ where: { employeeId, at: { gte: from, lt: to }, NOT: { photo: null } }, select: { id: true } }),
+  ]);
+
   const today = zonedParts(new Date(), timeZone).date;
   const dtr = computeDtr({
     days,
@@ -136,18 +155,69 @@ export async function dtrForMonth(employeeId: string, month: string) {
     shift,
     timeZone,
     holidays: new Map(holidays.map((h) => [h.date.toISOString().slice(0, 10), h.name])),
-    leaves: leaveMap,
+    leaves: leaveMapOf(leaves),
     today,
   });
-  const withPhoto = new Set(
-    (await prisma.attendancePunch.findMany({ where: { employeeId, at: { gte: from, lt: to }, NOT: { photo: null } }, select: { id: true } })).map((p) => p.id),
-  );
+  const withPhoto = new Set(photoIds.map((p) => p.id));
   const punchesByDay = new Map<string, typeof punches>();
   for (const p of punches) {
     const d = attendanceSlot(p.at, shift, timeZone).day;
     (punchesByDay.get(d) ?? punchesByDay.set(d, []).get(d)!).push(p);
   }
   return { ...dtr, shift, timeZone, punchesByDay, withPhoto };
+}
+
+/**
+ * DTR totals for many employees in one month: 4 queries total instead of ~6 per employee.
+ * `emps` must be selected with dtrEmployeeSelect.
+ * Same math as dtrForMonth; punches/holidays/leaves are fetched set-based and split per employee in memory.
+ */
+export const dtrEmployeeSelect = { id: true, locationId: true, shift: true, location: { select: { timezone: true } } } as const;
+type DtrEmployee = Prisma.EmployeeGetPayload<{ select: typeof dtrEmployeeSelect }>;
+
+export async function dtrTotalsForMonth(emps: DtrEmployee[], month: string) {
+  const employeeIds = emps.map((e) => e.id);
+  const days = monthDays(month);
+  const first = days[0]!;
+  const last = days.at(-1)!;
+  // Every employee's window sits inside [first - 1d, last + 3d] whatever the shift start or UTC offset; trimmed per employee below.
+  const [def, punches, holidays, leaves] = await Promise.all([
+    defaultShift(),
+    prisma.attendancePunch.findMany({
+      where: { employeeId: { in: employeeIds }, at: { gte: new Date(Date.parse(first) - 86400_000), lt: new Date(Date.parse(addDaysIso(last, 3))) } },
+      select: { employeeId: true, at: true },
+      orderBy: { at: "asc" },
+    }),
+    prisma.holiday.findMany({ where: { date: { gte: new Date(first), lte: new Date(last) } }, select: { date: true, name: true, locationId: true } }),
+    prisma.leaveRequest.findMany({
+      where: { employeeId: { in: employeeIds }, ...approvedLeaveWhere(first, last) },
+      select: { employeeId: true, startDate: true, endDate: true, startDayPart: true, endDayPart: true, leaveType: { select: { code: true } } },
+    }),
+  ]);
+
+  const group = <T extends { employeeId: string }>(rows: T[]) => {
+    const m = new Map<string, T[]>();
+    for (const r of rows) (m.get(r.employeeId) ?? m.set(r.employeeId, []).get(r.employeeId)!).push(r);
+    return m;
+  };
+  const punchesBy = group(punches);
+  const leavesBy = group(leaves);
+  const out = new Map<string, ReturnType<typeof computeDtr>["totals"]>();
+  for (const e of emps) {
+    const { shift, timeZone } = toClock(e.shift ?? def, e.location?.timezone);
+    const { from, to } = monthWindow(month, shift, timeZone);
+    const dtr = computeDtr({
+      days,
+      punches: (punchesBy.get(e.id) ?? []).map((p) => p.at).filter((at) => at >= from && at < to),
+      shift,
+      timeZone,
+      holidays: new Map(holidays.filter((h) => h.locationId === null || h.locationId === e.locationId).map((h) => [h.date.toISOString().slice(0, 10), h.name])),
+      leaves: leaveMapOf(leavesBy.get(e.id) ?? []),
+      today: zonedParts(new Date(), timeZone).date,
+    });
+    out.set(e.id, dtr.totals);
+  }
+  return out;
 }
 
 /** Who is in right now, for a set of employees (null = everyone). */

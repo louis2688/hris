@@ -8,6 +8,7 @@ import { requireSession } from "@/server/auth/session";
 import { canAccessEmployee } from "@/server/authz";
 import { dtrForMonth, todaysPunches } from "@/server/services/attendance";
 import { getSetting } from "@/server/services/settings";
+import { AppError } from "@/server/services/errors";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { PunchCard } from "@/components/punch-card";
@@ -37,16 +38,17 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   if (!(await canAccessEmployee(user, employeeId))) notFound();
   const own = employeeId === user.employeeId;
 
-  const emp = await prisma.employee.findUnique({ where: { id: employeeId }, select: { firstName: true, lastName: true, preferredName: true, employeeCode: true, department: { select: { name: true } } } });
-  if (!emp) notFound();
   const tzNow = zonedParts(new Date(), "Asia/Manila").date.slice(0, 7);
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : tzNow;
-  const [dtr, today, policy, passkeys] = await Promise.all([
-    dtrForMonth(employeeId, month),
+  const [emp, dtr, today, policy, passkeys] = await Promise.all([
+    prisma.employee.findUnique({ where: { id: employeeId }, select: { firstName: true, lastName: true, preferredName: true, employeeCode: true, department: { select: { name: true } } } }),
+    // Runs alongside the emp lookup; a missing employee 404s below instead of hitting the error boundary.
+    dtrForMonth(employeeId, month).catch((e) => (e instanceof AppError && e.status === 404 ? null : Promise.reject(e))),
     own ? todaysPunches(employeeId) : null,
     getSetting("attendance"),
     own ? prisma.passkey.count({ where: { userId: user.id } }) : 0,
   ]);
+  if (!emp || !dtr) notFound();
   const monthLabel = new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" });
   const q = (m: string) => `/attendance?month=${m}${sp.employeeId ? `&employeeId=${sp.employeeId}` : ""}`;
   const punchLinks = new Map(

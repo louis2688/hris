@@ -73,10 +73,10 @@ export const getSession = cache(async (): Promise<SessionUser | null> => {
   if (!token) return null;
   const payload = await verifyToken(token);
   if (!payload) return null;
-  // Revalidate against DB so deactivation / role changes take effect immediately.
+  // Revalidate against DB so deactivation / role changes take effect immediately. The one DB hit per request.
   const user = await prisma.user.findUnique({
     where: { id: payload.id },
-    include: { employee: { select: { id: true, firstName: true, lastName: true, preferredName: true } } },
+    select: { id: true, email: true, role: true, isActive: true, employee: { select: { id: true, firstName: true, lastName: true, preferredName: true } } },
   });
   if (!user || !user.isActive) return null;
   return toSessionUser(user);

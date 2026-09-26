@@ -4,7 +4,7 @@ import { Plus, Search } from "lucide-react";
 import { EMPLOYMENT_STATUSES, EMPLOYMENT_STATUS_LABELS, employeeListQuerySchema } from "@hris/shared";
 import { gate } from "@/server/auth/session";
 import { listEmployees } from "@/server/services/employees";
-import { listDepartments } from "@/server/services/org";
+import { departmentOptions } from "@/server/services/org";
 import { Card, EmptyState, PageHeader } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
@@ -19,7 +19,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   await gate("ADMIN", "HR");
   const raw = await searchParams;
   const q = employeeListQuerySchema.parse(raw);
-  const [data, departments] = await Promise.all([listEmployees(q, null), listDepartments()]);
+  const [data, departments] = await Promise.all([listEmployees(q, null), departmentOptions()]);
   const href = (page: number) => `/employees${toSearchParams({ ...raw, page })}`;
 
   return (

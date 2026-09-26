@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@hris/db";
+import { prisma, type Prisma } from "@hris/db";
 import type { DepartmentInput, HolidayInput, JobTitleInput, LocationInput, SessionUser } from "@hris/shared";
 import { audit } from "./audit";
 import { AppError, conflict } from "./errors";
@@ -15,6 +15,9 @@ export const listDepartments = () =>
       _count: { select: { employees: { where: { deletedAt: null } } } },
     },
   });
+
+/** id + name only, for filter dropdowns (listDepartments also joins head, parent and counts). */
+export const departmentOptions = () => prisma.department.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
 
 export async function saveDepartment(actor: SessionUser, d: DepartmentInput, id?: string) {
   if (id && d.parentId === id) throw new AppError("A department cannot be its own parent");
@@ -104,12 +107,13 @@ export async function deleteHoliday(actor: SessionUser, id: string) {
   await audit(actor.id, "holiday.delete", "Holiday", id);
 }
 
+/** Holidays for an employee (global + their location), one query via the relation instead of employee -> holiday. */
+export const employeeHolidayWhere = (employeeId: string | null): Prisma.HolidayWhereInput => ({
+  OR: [{ locationId: null }, ...(employeeId ? [{ location: { employees: { some: { id: employeeId } } } }] : [])],
+});
+
 /** ISO dates of holidays applying to an employee (global + their location). */
 export async function holidayDatesFor(employeeId: string | null, from: Date, to: Date): Promise<string[]> {
-  const emp = employeeId ? await prisma.employee.findUnique({ where: { id: employeeId }, select: { locationId: true } }) : null;
-  const rows = await prisma.holiday.findMany({
-    where: { date: { gte: from, lte: to }, OR: [{ locationId: null }, ...(emp?.locationId ? [{ locationId: emp.locationId }] : [])] },
-    select: { date: true },
-  });
+  const rows = await prisma.holiday.findMany({ where: { date: { gte: from, lte: to }, ...employeeHolidayWhere(employeeId) }, select: { date: true } });
   return rows.map((r) => r.date.toISOString().slice(0, 10));
 }

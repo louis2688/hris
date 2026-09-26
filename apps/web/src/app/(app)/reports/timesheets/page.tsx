@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { TIMESHEET_STATUSES } from "@hris/shared";
 import { gate } from "@/server/auth/session";
 import { isStaff } from "@/server/authz";
-import { listDepartments } from "@/server/services/org";
+import { departmentOptions } from "@/server/services/org";
 import { listProjects } from "@/server/services/timesheets";
 import { REPORTS, searchToParams } from "@/server/services/reports";
 import { DepartmentFilter, ReportFilter, ReportTable } from "@/components/report-table";
@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Timesheet report" };
 export default async function TimesheetReportPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await gate("MANAGER", "HR", "ADMIN");
   const params = searchToParams(await searchParams);
-  const [report, departments, projects] = await Promise.all([REPORTS.timesheets(user, params), isStaff(user) ? listDepartments() : [], listProjects()]);
+  const [report, departments, projects] = await Promise.all([REPORTS.timesheets(user, params), isStaff(user) ? departmentOptions() : [], listProjects()]);
   const f = report.filters;
   return (
     <ReportTable slug="timesheets" query={params.toString()} report={report}>

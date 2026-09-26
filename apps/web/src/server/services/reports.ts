@@ -11,7 +11,7 @@ import {
   type SessionUser,
 } from "@hris/shared";
 import { visibleEmployeeIds } from "../authz";
-import { dtrForMonth } from "./attendance";
+import { dtrEmployeeSelect, dtrTotalsForMonth } from "./attendance";
 import { fullName } from "./employees";
 import { fmtDate } from "@/lib/utils";
 
@@ -183,28 +183,23 @@ async function attendance(user: SessionUser, p: URLSearchParams): Promise<Report
   const emps = await prisma.employee.findMany({
     where: { ...(await scope(user, f.departmentId)), employmentStatus: { notIn: [...SEPARATED] } },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-    select: whoSelect,
+    select: { ...whoSelect, ...dtrEmployeeSelect },
   });
-  // ponytail: dtrForMonth per employee in batches of 10 to spare the connection pool; a set-based DTR query if this gets slow.
-  const rows: Record<string, Cell>[] = [];
-  for (let i = 0; i < emps.length; i += 10) {
-    const batch = emps.slice(i, i + 10);
-    const dtrs = await Promise.all(batch.map((e) => dtrForMonth(e.id, month)));
-    batch.forEach((e, j) => {
-      const t = dtrs[j]!.totals;
-      rows.push({
-        ...who(e),
-        present: t.present,
-        absent: t.absent,
-        leaveDays: t.leaveDays,
-        lateCount: t.lateCount,
-        lateMinutes: t.lateMinutes,
-        undertimeMinutes: t.undertimeMinutes,
-        overtimeMinutes: t.overtimeMinutes,
-        hours: round(t.workedMinutes / 60),
-      });
-    });
-  }
+  const totals = await dtrTotalsForMonth(emps, month);
+  const rows: Record<string, Cell>[] = emps.map((e) => {
+    const t = totals.get(e.id)!;
+    return {
+      ...who(e),
+      present: t.present,
+      absent: t.absent,
+      leaveDays: t.leaveDays,
+      lateCount: t.lateCount,
+      lateMinutes: t.lateMinutes,
+      undertimeMinutes: t.undertimeMinutes,
+      overtimeMinutes: t.overtimeMinutes,
+      hours: round(t.workedMinutes / 60),
+    };
+  });
   const columns: Column[] = [
     ...nameCols,
     { key: "present", label: "Present", num: true },

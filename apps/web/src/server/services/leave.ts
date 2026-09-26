@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma, Prisma } from "@hris/db";
 import {
   countLeaveDays,
@@ -23,8 +24,10 @@ const num = (d: Prisma.Decimal | number | null | undefined) => (d == null ? 0 : 
 
 // ---------- Leave types ----------
 
-export const listLeaveTypes = (activeOnly = false) =>
-  prisma.leaveType.findMany({ where: activeOnly ? { isActive: true } : undefined, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
+/** Cached per request: /me/leave reads active types 3x (form + two years of balances). */
+export const listLeaveTypes = cache((activeOnly: boolean = false) =>
+  prisma.leaveType.findMany({ where: activeOnly ? { isActive: true } : undefined, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
+);
 
 export async function saveLeaveType(actor: SessionUser, d: LeaveTypeInput, id?: string) {
   const data = {
@@ -94,7 +97,7 @@ export async function getBalances(employeeId: string, year: number): Promise<Lea
   const yearStart = new Date(Date.UTC(year, 0, 1));
   const yearEnd = new Date(Date.UTC(year, 11, 31));
   const [types, entitlements, usage] = await Promise.all([
-    prisma.leaveType.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
+    listLeaveTypes(true),
     prisma.leaveEntitlement.findMany({ where: { employeeId, year } }),
     prisma.leaveRequest.groupBy({
       by: ["leaveTypeId", "status"],

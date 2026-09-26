@@ -4,7 +4,7 @@ import { LEAVE_STATUSES, LEAVE_STATUS_LABELS, leaveListQuerySchema } from "@hris
 import { gate } from "@/server/auth/session";
 import { isStaff, visibleEmployeeIds } from "@/server/authz";
 import { listLeaveRequests, listLeaveTypes } from "@/server/services/leave";
-import { listDepartments } from "@/server/services/org";
+import { departmentOptions } from "@/server/services/org";
 import { Card, PageHeader } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
@@ -19,7 +19,7 @@ export default async function LeavePage({ searchParams }: { searchParams: Promis
   const raw = await searchParams;
   const q = leaveListQuerySchema.parse(raw);
   const scope = await visibleEmployeeIds(user);
-  const [data, types, departments] = await Promise.all([listLeaveRequests(q, scope), listLeaveTypes(), isStaff(user) ? listDepartments() : Promise.resolve([])]);
+  const [data, types, departments] = await Promise.all([listLeaveRequests(q, scope), listLeaveTypes(), isStaff(user) ? departmentOptions() : Promise.resolve([])]);
 
   return (
     <>

@@ -21,8 +21,12 @@ const include = {
 };
 
 export async function getOrCreateTimesheet(employeeId: string, weekStart: string) {
-  const ws = new Date(weekOf(weekStart));
-  return prisma.timesheet.upsert({ where: { employeeId_weekStart: { employeeId, weekStart: ws } }, create: { employeeId, weekStart: ws }, update: {}, include });
+  const where = { employeeId_weekStart: { employeeId, weekStart: new Date(weekOf(weekStart)) } };
+  // Existing sheet (the common case) is one query; Prisma runs an upsert with nested include as select -> insert -> select.
+  return (
+    (await prisma.timesheet.findUnique({ where, include })) ??
+    prisma.timesheet.upsert({ where, create: where.employeeId_weekStart, update: {}, include })
+  );
 }
 
 export async function getTimesheet(id: string) {

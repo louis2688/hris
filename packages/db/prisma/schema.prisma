@@ -2,6 +2,8 @@ generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
   runtime  = "nodejs"
+  // Nested include/select in one SQL query (LATERAL joins) instead of one query per relation level.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -313,6 +315,9 @@ model Employee {
   @@index([departmentId])
   @@index([managerId])
   @@index([employmentStatus])
+  @@index([locationId])
+  @@index([jobTitleId])
+  @@index([shiftId])
 }
 
 model EmergencyContact {
@@ -399,6 +404,7 @@ model LeaveRequest {
   @@index([employeeId, status])
   @@index([status, createdAt])
   @@index([startDate, endDate])
+  @@index([leaveTypeId])
 }
 
 model LeaveRequestEvent {
@@ -486,6 +492,7 @@ model EmployeeQualification {
   qualification Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
+  @@index([qualificationId])
 }
 
 // ---------- Time & attendance ----------
@@ -610,6 +617,8 @@ model TimesheetEntry {
   project   Project   @relation(fields: [projectId], references: [id])
 
   @@index([timesheetId])
+  @@index([projectId])
+  @@index([date])
 }
 
 // ---------- Recruitment ----------
@@ -674,6 +683,7 @@ model Interview {
 
   @@index([candidateId])
   @@index([scheduledAt])
+  @@index([interviewerId])
 }
 
 // ---------- Performance ----------
@@ -726,6 +736,7 @@ model PerformanceReview {
 
   @@unique([cycleId, employeeId])
   @@index([reviewerId])
+  @@index([employeeId])
 }
 
 model ReviewItem {
