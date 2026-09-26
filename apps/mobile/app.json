@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "HRIS",
+    "slug": "hris-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "hris",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.hris.mobile",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.hris.mobile"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-local-authentication", { "faceIDPermission": "Confirm it's you before clocking in or out." }],
+      ["expo-image-picker", { "cameraPermission": "Take a selfie when your company requires one to clock in or out.", "photosPermission": false, "microphonePermission": false }],
+      ["expo-location", { "locationWhenInUsePermission": "Record where you clock in or out when your company requires it." }]
+    ]
+  }
+}
