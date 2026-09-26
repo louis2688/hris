@@ -61,6 +61,81 @@ enum DayPart {
   PM
 }
 
+enum ApproverKind {
+  MANAGER
+  HR
+  ADMIN
+}
+
+enum QualificationKind {
+  SKILL
+  LICENSE
+  MEMBERSHIP
+}
+
+enum PunchDirection {
+  IN
+  OUT
+}
+
+enum PunchSource {
+  WEB
+  MOBILE
+  DEVICE
+  MANUAL
+}
+
+enum PunchMethod {
+  NONE
+  PASSKEY
+  PHOTO
+  FINGERPRINT
+  FACE
+  CARD
+  PIN
+}
+
+enum TimesheetStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum VacancyStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+enum CandidateStage {
+  APPLIED
+  SHORTLISTED
+  INTERVIEW
+  OFFERED
+  HIRED
+  REJECTED
+  WITHDRAWN
+}
+
+enum InterviewResult {
+  PENDING
+  PASSED
+  FAILED
+}
+
+enum ReviewCycleStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum ReviewStatus {
+  SELF_REVIEW
+  MANAGER_REVIEW
+  COMPLETED
+}
+
 enum LeaveEventAction {
   SUBMITTED
   APPROVED
@@ -86,6 +161,7 @@ model User {
   notifications Notification[]
   auditLogs     AuditLog[]
   leaveEvents   LeaveRequestEvent[]
+  passkeys      Passkey[]
 
   @@index([role])
 }
@@ -119,6 +195,7 @@ model Department {
   parent    Department?  @relation("DepartmentTree", fields: [parentId], references: [id], onDelete: SetNull)
   children  Department[] @relation("DepartmentTree")
   employees Employee[]
+  vacancies Vacancy[]
 }
 
 model JobTitle {
@@ -129,6 +206,8 @@ model JobTitle {
   updatedAt   DateTime @updatedAt
 
   employees Employee[]
+  vacancies Vacancy[]
+  kpis      Kpi[]
 }
 
 model Location {
@@ -143,6 +222,8 @@ model Location {
 
   employees Employee[]
   holidays  Holiday[]
+  vacancies Vacancy[]
+  devices   BiometricDevice[]
 }
 
 model Holiday {
@@ -198,6 +279,8 @@ model Employee {
   hireDate         DateTime         @db.Date
   terminationDate  DateTime?        @db.Date
   notes            String?
+  shiftId          String?
+  biometricId      String?          @unique
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -215,6 +298,16 @@ model Employee {
   leaveEntitlements LeaveEntitlement[]
   leaveRequests     LeaveRequest[]
   approvedRequests  LeaveRequest[]     @relation("LeaveApprover")
+  shift             WorkShift?         @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  qualifications    EmployeeQualification[]
+  punches           AttendancePunch[]
+  timesheets        Timesheet[]        @relation("TimesheetOwner")
+  decidedTimesheets Timesheet[]        @relation("TimesheetDecider")
+  managedVacancies  Vacancy[]
+  hiredFrom         Candidate?
+  interviews        Interview[]
+  reviews           PerformanceReview[] @relation("Reviewee")
+  reviewsToGive     PerformanceReview[] @relation("Reviewer")
 
   @@index([lastName, firstName])
   @@index([departmentId])
@@ -249,6 +342,8 @@ model LeaveType {
   maxConsecutiveDays Int?
   isActive           Boolean  @default(true)
   sortOrder          Int      @default(0)
+  /// Sequential approvers, e.g. [MANAGER, HR]. Empty or requiresApproval=false means auto-approve.
+  approvalChain      ApproverKind[] @default([MANAGER])
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -290,6 +385,9 @@ model LeaveRequest {
   decidedAt    DateTime?
   decisionNote String?
   cancelledAt  DateTime?
+  /// Snapshot of the leave type chain at submit time; currentLevel indexes into it.
+  approvalChain ApproverKind[] @default([])
+  currentLevel  Int            @default(0)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -308,6 +406,7 @@ model LeaveRequestEvent {
   requestId   String
   actorUserId String?
   action      LeaveEventAction
+  level       Int?
   note        String?
   createdAt   DateTime         @default(now())
 
@@ -348,4 +447,301 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+// ---------- Qualifications (PIM) ----------
+
+model Nationality {
+  id   String @id @default(cuid())
+  name String @unique
+}
+
+model Qualification {
+  id          String            @id @default(cuid())
+  kind        QualificationKind
+  name        String
+  description String?
+  createdAt   DateTime          @default(now())
+
+  holders EmployeeQualification[]
+
+  @@unique([kind, name])
+}
+
+model EmployeeQualification {
+  id              String    @id @default(cuid())
+  employeeId      String
+  qualificationId String
+  /// Skill: proficiency / years. License: - . Membership: subscription paid by.
+  level           String?
+  /// License number or membership id.
+  number          String?
+  issuedDate      DateTime? @db.Date
+  expiryDate      DateTime? @db.Date
+  amount          Decimal?  @db.Decimal(10, 2)
+  notes           String?
+  createdAt       DateTime  @default(now())
+
+  employee      Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  qualification Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+// ---------- Time & attendance ----------
+
+model WorkShift {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  /// HH:mm in the employee's location timezone
+  startTime    String   @default("09:00")
+  endTime      String   @default("18:00")
+  breakMinutes Int      @default(60)
+  graceMinutes Int      @default(0)
+  /// 0 = Sunday .. 6 = Saturday
+  workDays     Int[]    @default([1, 2, 3, 4, 5])
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  employees Employee[]
+}
+
+model AttendancePunch {
+  id          String          @id @default(cuid())
+  employeeId  String
+  at          DateTime
+  direction   PunchDirection?
+  source      PunchSource
+  method      PunchMethod     @default(NONE)
+  deviceId    String?
+  latitude    Float?
+  longitude   Float?
+  note        String?
+  /// Small JPEG selfie. Omitted from queries by default (see db client).
+  photo       Bytes?
+  createdById String?
+  createdAt   DateTime        @default(now())
+
+  employee Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  device   BiometricDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@unique([employeeId, at])
+  @@index([at])
+}
+
+model BiometricDevice {
+  id         String    @id @default(cuid())
+  name       String
+  serial     String    @unique
+  locationId String?
+  apiKeyHash String?
+  isActive   Boolean   @default(true)
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  location Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  punches  AttendancePunch[]
+}
+
+model Passkey {
+  id           String    @id @default(cuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      Int       @default(0)
+  transports   String[]
+  name         String
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// ---------- Timesheets ----------
+
+model Project {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  client    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  entries TimesheetEntry[]
+}
+
+model Timesheet {
+  id           String          @id @default(cuid())
+  employeeId   String
+  /// Monday of the week
+  weekStart    DateTime        @db.Date
+  status       TimesheetStatus @default(DRAFT)
+  submittedAt  DateTime?
+  decidedById  String?
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  employee  Employee         @relation("TimesheetOwner", fields: [employeeId], references: [id], onDelete: Cascade)
+  decidedBy Employee?        @relation("TimesheetDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  entries   TimesheetEntry[]
+
+  @@unique([employeeId, weekStart])
+  @@index([status])
+}
+
+model TimesheetEntry {
+  id          String   @id @default(cuid())
+  timesheetId String
+  projectId   String
+  activity    String?
+  date        DateTime @db.Date
+  hours       Decimal  @db.Decimal(4, 2)
+
+  timesheet Timesheet @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+  project   Project   @relation(fields: [projectId], references: [id])
+
+  @@index([timesheetId])
+}
+
+// ---------- Recruitment ----------
+
+model Vacancy {
+  id              String        @id @default(cuid())
+  title           String
+  jobTitleId      String?
+  departmentId    String?
+  locationId      String?
+  hiringManagerId String?
+  positions       Int           @default(1)
+  description     String?
+  status          VacancyStatus @default(OPEN)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  jobTitle      JobTitle?   @relation(fields: [jobTitleId], references: [id], onDelete: SetNull)
+  department    Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  location      Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  hiringManager Employee?   @relation(fields: [hiringManagerId], references: [id], onDelete: SetNull)
+  candidates    Candidate[]
+}
+
+model Candidate {
+  id              String         @id @default(cuid())
+  firstName       String
+  lastName        String
+  email           String
+  phone           String?
+  vacancyId       String?
+  stage           CandidateStage @default(APPLIED)
+  source          String?
+  resumeUrl       String?
+  notes           String?
+  appliedAt       DateTime       @default(now()) @db.Date
+  hiredEmployeeId String?        @unique
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  vacancy       Vacancy?    @relation(fields: [vacancyId], references: [id], onDelete: SetNull)
+  hiredEmployee Employee?   @relation(fields: [hiredEmployeeId], references: [id], onDelete: SetNull)
+  interviews    Interview[]
+
+  @@index([vacancyId])
+  @@index([stage])
+}
+
+model Interview {
+  id            String          @id @default(cuid())
+  candidateId   String
+  title         String
+  scheduledAt   DateTime
+  interviewerId String?
+  location      String?
+  result        InterviewResult @default(PENDING)
+  notes         String?
+  createdAt     DateTime        @default(now())
+
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  interviewer Employee? @relation(fields: [interviewerId], references: [id], onDelete: SetNull)
+
+  @@index([candidateId])
+  @@index([scheduledAt])
+}
+
+// ---------- Performance ----------
+
+model Kpi {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  /// Null = applies to everyone
+  jobTitleId  String?
+  minRating   Int      @default(1)
+  maxRating   Int      @default(5)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  jobTitle JobTitle?    @relation(fields: [jobTitleId], references: [id], onDelete: Cascade)
+  items    ReviewItem[]
+}
+
+model ReviewCycle {
+  id          String            @id @default(cuid())
+  name        String
+  periodStart DateTime          @db.Date
+  periodEnd   DateTime          @db.Date
+  dueDate     DateTime          @db.Date
+  status      ReviewCycleStatus @default(DRAFT)
+  createdAt   DateTime          @default(now())
+
+  reviews PerformanceReview[]
+}
+
+model PerformanceReview {
+  id             String       @id @default(cuid())
+  cycleId        String
+  employeeId     String
+  reviewerId     String?
+  status         ReviewStatus @default(SELF_REVIEW)
+  selfComment    String?
+  managerComment String?
+  finalRating    Decimal?     @db.Decimal(3, 2)
+  submittedAt    DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  cycle    ReviewCycle  @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  employee Employee     @relation("Reviewee", fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewer Employee?    @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  items    ReviewItem[]
+
+  @@unique([cycleId, employeeId])
+  @@index([reviewerId])
+}
+
+model ReviewItem {
+  id             String  @id @default(cuid())
+  reviewId       String
+  kpiId          String?
+  kpiName        String
+  minRating      Int
+  maxRating      Int
+  selfRating     Int?
+  selfComment    String?
+  managerRating  Int?
+  managerComment String?
+
+  review PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  kpi    Kpi?              @relation(fields: [kpiId], references: [id], onDelete: SetNull)
+
+  @@index([reviewId])
 }
