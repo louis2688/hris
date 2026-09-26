@@ -183,6 +183,66 @@ async function main() {
     await mk("EMP-0007", VL.id, plus(nextMon, 1), plus(nextMon, 1), 1, "APPROVED", "Errand");
   }
 
+  // ---- Performance: KPIs + one active cycle with reviews ----
+  const kpi = async (name: string, description: string, jobTitleId: string | null = null) =>
+    (await prisma.kpi.findFirst({ where: { name, jobTitleId } })) ?? (await prisma.kpi.create({ data: { name, description, jobTitleId } }));
+  await kpi("Quality of work", "Accuracy, thoroughness and reliability of output");
+  await kpi("Productivity", "Delivers agreed work on time");
+  await kpi("Teamwork", "Collaborates, shares knowledge and supports colleagues");
+  await kpi("Communication", "Clear, timely and professional communication");
+  await kpi("Code quality", "Readable, tested, maintainable code and helpful code reviews", titles["Senior Software Engineer"]!.id);
+
+  const cycleName = `H2 ${YEAR}`;
+  const cycle =
+    (await prisma.reviewCycle.findFirst({ where: { name: cycleName } })) ??
+    (await prisma.reviewCycle.create({ data: { name: cycleName, periodStart: d(`${YEAR}-07-01`), periodEnd: d(`${YEAR}-12-31`), dueDate: d(`${YEAR + 1}-01-15`), status: "ACTIVE" } }));
+  if (cycle.status === "ACTIVE") {
+    // Same rules as activateCycle in apps/web/src/server/services/performance.ts
+    const emps = await prisma.employee.findMany({ where: { deletedAt: null, employmentStatus: { notIn: ["RESIGNED", "TERMINATED"] }, hireDate: { lte: cycle.periodEnd } }, select: { id: true, managerId: true, jobTitleId: true } });
+    const kpis = await prisma.kpi.findMany({ where: { isActive: true } });
+    await prisma.performanceReview.createMany({ data: emps.map((e) => ({ cycleId: cycle.id, employeeId: e.id, reviewerId: e.managerId })), skipDuplicates: true });
+    const empty = await prisma.performanceReview.findMany({ where: { cycleId: cycle.id, items: { none: {} } }, select: { id: true, employeeId: true } });
+    const jt = new Map(emps.map((e) => [e.id, e.jobTitleId]));
+    await prisma.reviewItem.createMany({
+      data: empty.flatMap((r) => kpis.filter((k) => !k.jobTitleId || k.jobTitleId === jt.get(r.employeeId)).map((k) => ({ reviewId: r.id, kpiId: k.id, kpiName: k.name, minRating: k.minRating, maxRating: k.maxRating }))),
+    });
+  }
+
+  // ---- Recruitment demo: 2 open vacancies, candidates across stages ----
+  const vacancy = async (title: string, data: { jobTitleId: string; departmentId: string; locationId: string; hiringManagerId: string; positions: number; description: string }) =>
+    (await prisma.vacancy.findFirst({ where: { title } })) ?? (await prisma.vacancy.create({ data: { title, status: "OPEN", ...data } }));
+  const backend = await vacancy("Backend Software Engineer", {
+    jobTitleId: titles["Software Engineer"]!.id, departmentId: depts.ENG!.id, locationId: manila.id, hiringManagerId: byCode.get("EMP-0003")!, positions: 2,
+    description: "Build and run our Java/Spring and Node services. 3+ years experience.",
+  });
+  const support = await vacancy("Customer Support Specialist", {
+    jobTitleId: titles["Support Specialist"]!.id, departmentId: depts.CS!.id, locationId: cebu.id, hiringManagerId: byCode.get("EMP-0009")!, positions: 1,
+    description: "Handle customer chats and email. Night shift allowance.",
+  });
+  const inDays = (n: number, hour = 10) => {
+    const t = new Date();
+    t.setUTCDate(t.getUTCDate() + n);
+    t.setUTCHours(hour - 8, 0, 0, 0); // Manila time
+    return t;
+  };
+  const candidates: { first: string; last: string; vacancyId: string; stage: "APPLIED" | "SHORTLISTED" | "INTERVIEW" | "OFFERED" | "REJECTED"; source: string; interview?: { title: string; at: Date; result: "PENDING" | "PASSED" | "FAILED"; by: string } }[] = [
+    { first: "Carlo", last: "Aquino", vacancyId: backend.id, stage: "APPLIED", source: "LinkedIn" },
+    { first: "Jasmine", last: "Navarro", vacancyId: backend.id, stage: "SHORTLISTED", source: "Referral" },
+    { first: "Mark", last: "Villareal", vacancyId: backend.id, stage: "INTERVIEW", source: "JobStreet", interview: { title: "Technical interview", at: inDays(3), result: "PENDING", by: "EMP-0003" } },
+    { first: "Patricia", last: "Gomez", vacancyId: support.id, stage: "OFFERED", source: "Kalibrr", interview: { title: "Initial interview", at: inDays(-5, 14), result: "PASSED", by: "EMP-0009" } },
+    { first: "Leo", last: "Santiago", vacancyId: support.id, stage: "REJECTED", source: "Walk-in" },
+  ];
+  for (const c of candidates) {
+    const email = `${c.first}.${c.last}@example.com`.toLowerCase();
+    if (await prisma.candidate.findFirst({ where: { email, vacancyId: c.vacancyId } })) continue;
+    await prisma.candidate.create({
+      data: {
+        firstName: c.first, lastName: c.last, email, vacancyId: c.vacancyId, stage: c.stage, source: c.source,
+        interviews: c.interview ? { create: { title: c.interview.title, scheduledAt: c.interview.at, result: c.interview.result, interviewerId: byCode.get(c.interview.by) } } : undefined,
+      },
+    });
+  }
+
   console.log(`Seeded. ${people.length} employees. Password for all demo accounts: ${PASSWORD}`);
 }
 

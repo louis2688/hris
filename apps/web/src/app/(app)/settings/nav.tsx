@@ -14,6 +14,8 @@ const ITEMS = [
   { href: "/settings/holidays", label: "Holidays" },
   { href: "/settings/attendance", label: "Attendance" },
   { href: "/settings/projects", label: "Projects" },
+  { href: "/settings/kpis", label: "KPIs" },
+  { href: "/settings/review-cycles", label: "Review cycles" },
 ];
 
 export function SettingsNav() {

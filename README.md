@@ -1,6 +1,6 @@
 # HRIS
 
-Human resources management system: employee records, leave management with approvals, and an employee self-service portal. Web app now, React Native (Expo) mobile app next, sharing the same API and contracts.
+Human resources management system: employee records (PIM with skills, licenses, memberships), leave with multi-level approvals, time and attendance (DTR, fingerprint / Face ID passkeys, selfie on punch, ZKTeco terminals), timesheets, recruitment, performance reviews, reports with CSV / PDF export, email notifications and an employee self-service portal. Web app now, React Native (Expo) mobile app next, sharing the same API and contracts.
 
 ## Stack
 
@@ -115,10 +115,22 @@ Errors: `{ error: { code, message, details? } }` with 401 / 403 / 404 / 409 / 42
 
 The Expo app should import `@hris/shared` for the request/response schemas and reuse `countLeaveDays` for the live day counter.
 
+## Attendance and biometrics
+
+- Web punch: `/attendance`. Policy (Settings > Attendance) can require a passkey (device fingerprint / Face ID via WebAuthn), a selfie (small JPEG, stored with the punch) and location.
+- DTR per month with late, undertime and OT against the employee's work shift (night shifts supported). Print for a signed copy.
+- Biometric terminals: add the device in Settings > Attendance, set each employee's Biometric ID to their enroll number on the terminal.
+  - ZKTeco (ADMS push): point the device's Cloud Server to `https://<your-app>/iclock` (port 443). Optional `ADMS_ALLOWED_IPS` (comma list) locks the endpoint to your office IPs.
+  - Anything else: `POST /api/v1/attendance/device-punches` with header `X-Device-Key` and `{ punches: [{ biometricId, at, direction?, method? }] }`.
+
+## Email
+
+Set `SMTP_URL` (e.g. `smtps://user%40gmail.com:APP_PASSWORD@smtp.gmail.com:465`) and optionally `MAIL_FROM`, `APP_URL`. Every in-app notification is then also emailed. Unset = in-app only. Admins can `POST /api/v1/admin/test-email` to check delivery.
+
 ## Deploying
 
-Any Node host works (Vercel, Cloud Run, a VM). Set the four env vars, run `pnpm build`, start with `pnpm --filter @hris/web start`. Use the Supabase transaction pooler (port 6543) for `DATABASE_URL` on serverless platforms and keep `DIRECT_URL` on 5432 for migrations.
+Any Node host works (Vercel, Cloud Run, a VM). Set the env vars (DATABASE_URL, DIRECT_URL, AUTH_SECRET, NEXT_PUBLIC_APP_URL, optional SMTP_URL / MAIL_FROM / APP_URL / ADMS_ALLOWED_IPS), run `pnpm build`, start with `pnpm --filter @hris/web start`. Use the Supabase transaction pooler (port 6543) for `DATABASE_URL` on serverless platforms and keep `DIRECT_URL` on 5432 for migrations.
 
 ## Not in this release
 
-Attendance/timesheets, recruitment, performance reviews, payroll, document uploads, email delivery for notifications (in-app only), SSO. The schema and service layer are laid out so these are additive modules.
+Payroll, document uploads, SSO, in-browser face recognition. The schema and service layer are laid out so these are additive modules.
