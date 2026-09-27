@@ -21,6 +21,7 @@ import { EntitlementEditor } from "./entitlement-editor";
 import { DocumentsCard } from "@/components/documents-card";
 import { listForEmployee, uploadCategories } from "@/server/services/documents";
 import type { SessionUser } from "@hris/shared";
+import { AssetsTab, OnboardingTab } from "./people-tabs";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -41,6 +42,8 @@ const TABS = [
   { key: "qualifications", label: "Qualifications" },
   { key: "leave", label: "Leave" },
   { key: "documents", label: "Documents" },
+  { key: "onboarding", label: "Onboarding" },
+  { key: "assets", label: "Assets" },
   { key: "account", label: "Account" },
 ];
 
@@ -92,6 +95,8 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       {active === "qualifications" ? <QualTab employeeId={e.id} /> : null}
       {active === "leave" ? <LeaveTab employeeId={e.id} staff={staff} /> : null}
       {active === "documents" ? <DocumentsTab user={user} employeeId={e.id} /> : null}
+      {active === "onboarding" ? <OnboardingTab employeeId={e.id} /> : null}
+      {active === "assets" ? <AssetsTab employeeId={e.id} /> : null}
       {active === "account" ? <AccountPanel employeeId={e.id} account={e.user} defaultEmail={e.workEmail ?? ""} isSelf={e.user?.id === user.id} isAdmin={user.role === "ADMIN"} /> : null}
     </div>
   );

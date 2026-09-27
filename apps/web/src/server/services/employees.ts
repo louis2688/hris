@@ -12,6 +12,10 @@ import type {
 import { hashPassword } from "../auth/session";
 import { audit } from "./audit";
 import { AppError, conflict, notFound } from "./errors";
+import { startDefaultChecklist } from "./onboarding";
+
+/** Checklist hooks run after the employee write commits; a failure here must not fail the save. */
+const startChecklistSafe = (...a: Parameters<typeof startDefaultChecklist>) => startDefaultChecklist(...a).catch((e) => console.error("checklist start failed", e));
 
 export const employeeSummarySelect = {
   id: true,
@@ -179,6 +183,7 @@ export async function createEmployee(actor: SessionUser, d: CreateEmployeeInput)
   }
 
   await audit(actor.id, "employee.create", "Employee", employee.id, { after: employee });
+  await startChecklistSafe(actor.id, employee.id, "ONBOARDING");
   return { employee, initialPassword: d.createAccount ? initialPassword : null };
 }
 
@@ -197,6 +202,8 @@ export async function updateEmployee(actor: SessionUser, id: string, d: UpdateEm
     select: employeeSummarySelect,
   });
   await audit(actor.id, "employee.update", "Employee", id, { before, after });
+  const leaving = (s: string) => s === "RESIGNED" || s === "TERMINATED";
+  if (leaving(after.employmentStatus) && !leaving(before.employmentStatus)) await startChecklistSafe(actor.id, id, "OFFBOARDING", true);
   return after;
 }
 

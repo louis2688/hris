@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { Bell, CalendarClock, Clock, UserPlus, Users } from "lucide-react";
 import { EMPLOYMENT_STATUS_LABELS } from "@hris/shared";
@@ -13,6 +14,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { LeaveTypeDot } from "@/components/status-badge";
 import { fmtDate, fmtDateTime, fmtDays, fullName } from "@/lib/utils";
+import { AnnouncementStrip } from "../announcements/strip";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -39,6 +41,9 @@ export default async function DashboardPage() {
           </Link>
         }
       />
+      <Suspense fallback={null}>
+        <AnnouncementStrip user={user} />
+      </Suspense>
 
       <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {manager ? (

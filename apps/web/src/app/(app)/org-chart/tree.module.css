@@ -1,0 +1,74 @@
+/* Classic top-down org tree: nested ul/li, connectors drawn with pseudo-elements. */
+.tree {
+  --line: rgb(32 32 32 / 0.22);
+  --gap: 22px;
+}
+.tree ul {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: var(--gap) 0 0;
+  list-style: none;
+}
+.tree li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--gap) 6px 0;
+}
+/* horizontal rail halves + the drop into each child */
+.tree li::before,
+.tree li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: var(--gap);
+  border-top: 1px solid var(--line);
+}
+.tree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 1px solid var(--line);
+}
+.tree li:only-child::before {
+  display: none;
+}
+.tree li:only-child::after {
+  border-top: 0;
+}
+.tree li:first-child::before,
+.tree li:last-child::after {
+  border: 0 none;
+}
+.tree li:last-child::before {
+  border-right: 1px solid var(--line);
+  border-top-right-radius: 10px;
+}
+.tree li:first-child::after {
+  border-top-left-radius: 10px;
+}
+/* drop from the parent card down to the rail */
+.tree ul ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: var(--gap);
+  border-left: 1px solid var(--line);
+}
+/* roots stand alone: no rail between separate trees */
+.tree > ul {
+  padding-top: 0;
+  gap: 32px;
+}
+.tree > ul > li {
+  padding-top: 0;
+}
+.tree > ul > li::before,
+.tree > ul > li::after {
+  display: none;
+}
