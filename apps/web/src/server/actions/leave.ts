@@ -61,7 +61,7 @@ export async function addLeaveCommentAction(id: string, _p: ActionResult | undef
 
 export async function saveLeaveTypeAction(id: string | undefined, _p: ActionResult | undefined, fd: FormData): Promise<ActionResult> {
   const actor = await requireRole("ADMIN", "HR");
-  const p = parse(leaveTypeSchema, bools(formToObject(fd), ["isPaid", "requiresApproval", "allowHalfDay", "isActive"]));
+  const p = parse(leaveTypeSchema, bools(formToObject(fd), ["isPaid", "requiresApproval", "allowHalfDay", "isActive", "allowEncashment", "isCompensatory"]));
   if ("error" in p) return p.error;
   const r = await run(async () => void (await leave.saveLeaveType(actor, p.data, id)), "Saved");
   revalidatePath("/settings/leave-types");

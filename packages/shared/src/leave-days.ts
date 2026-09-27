@@ -68,3 +68,27 @@ export function eachDay(startDate: string, endDate: string): string[] {
   for (let d = parseISODate(startDate); d <= end; d = addDays(d, 1)) out.push(toISODate(d));
   return out;
 }
+
+/**
+ * Whole months of accrual in `year` as of `asOf` (YYYY-MM-DD). Accrual starts at max(Jan 1, hireDate).
+ * A month is complete once its monthiversary is reached: a Mar 15 start completes months on Apr 15, May 15, ...
+ * When the start day doesn't exist in a month (Jan 31 -> Feb), that month's last day counts.
+ * Counting stops at the end of the year (a Jan 1 start earns 12). 0 when asOf is before the start.
+ */
+export function completedAccrualMonths(year: number, hireDate: string, asOf: string): number {
+  const jan1 = `${year}-01-01`;
+  const next = `${year + 1}-01-01`;
+  const start = hireDate > jan1 ? hireDate : jan1;
+  const end = asOf < next ? asOf : next;
+  if (end <= start) return 0;
+  const [sy, sm, sd] = start.split("-").map(Number) as [number, number, number];
+  const [ey, em, ed] = end.split("-").map(Number) as [number, number, number];
+  let m = (ey - sy) * 12 + (em - sm);
+  if (ed < sd && ed < new Date(Date.UTC(ey, em, 0)).getUTCDate()) m--;
+  return Math.max(0, Math.min(12, m));
+}
+
+/** Days earned so far for an accruing leave type: min(entitled, accrualPerMonth x completed months). */
+export function accruedDays(entitled: number, accrualPerMonth: number, year: number, hireDate: string, asOf: string): number {
+  return Math.min(entitled, Math.round(accrualPerMonth * completedAccrualMonths(year, hireDate, asOf) * 100) / 100);
+}

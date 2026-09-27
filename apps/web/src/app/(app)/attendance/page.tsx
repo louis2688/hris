@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { minToHhmm, PUNCH_METHOD_LABELS, zonedParts } from "@hris/shared";
+import { addDaysIso, CORRECTION_MAX_DAYS_BACK, minToHhmm, PUNCH_METHOD_LABELS, zonedParts } from "@hris/shared";
 import { prisma } from "@hris/db";
 import { requireSession } from "@/server/auth/session";
-import { canAccessEmployee } from "@/server/authz";
+import { canAccessEmployee, isStaff } from "@/server/authz";
 import { dtrForMonth, todaysPunches } from "@/server/services/attendance";
 import { getSetting } from "@/server/services/settings";
+import { pendingCorrectionDates } from "@/server/services/timeoff";
 import { AppError } from "@/server/services/errors";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
@@ -38,15 +39,19 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   if (!(await canAccessEmployee(user, employeeId))) notFound();
   const own = employeeId === user.employeeId;
 
-  const tzNow = zonedParts(new Date(), "Asia/Manila").date.slice(0, 7);
+  const todayIso = zonedParts(new Date(), "Asia/Manila").date;
+  const tzNow = todayIso.slice(0, 7);
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : tzNow;
-  const [emp, dtr, today, policy, passkeys] = await Promise.all([
+  const fixFrom = addDaysIso(todayIso, -CORRECTION_MAX_DAYS_BACK);
+  const fixTo = addDaysIso(todayIso, -1);
+  const [emp, dtr, today, policy, passkeys, pendingFix] = await Promise.all([
     prisma.employee.findUnique({ where: { id: employeeId }, select: { firstName: true, lastName: true, preferredName: true, employeeCode: true, department: { select: { name: true } } } }),
     // Runs alongside the emp lookup; a missing employee 404s below instead of hitting the error boundary.
     dtrForMonth(employeeId, month).catch((e) => (e instanceof AppError && e.status === 404 ? null : Promise.reject(e))),
     own ? todaysPunches(employeeId) : null,
     getSetting("attendance"),
     own ? prisma.passkey.count({ where: { userId: user.id } }) : 0,
+    own ? pendingCorrectionDates(employeeId, fixFrom, fixTo) : null,
   ]);
   if (!emp || !dtr) notFound();
   const monthLabel = new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -64,7 +69,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         title={own ? "Attendance" : `DTR - ${fullName(emp)}`}
         description={`${emp.employeeCode}${emp.department ? ` · ${emp.department.name}` : ""} · Shift ${dtr.shift.name} ${dtr.shift.startTime}-${dtr.shift.endTime}`}
         actions={
-          <div className="flex items-center gap-1 print:hidden">
+          <div className="flex flex-wrap items-center gap-1 print:hidden">
             <Link href={q(shiftMonth(month, -1))} className={buttonVariants({ variant: "secondary", size: "icon" })} aria-label="Previous month">
               <ChevronLeft />
             </Link>
@@ -73,6 +78,14 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
               <ChevronRight />
             </Link>
             <PrintButton />
+            <Link href="/attendance/corrections" className={buttonVariants({ variant: "secondary" })}>
+              Corrections
+            </Link>
+            {isStaff(user) ? (
+              <Link href="/attendance/import" className={buttonVariants({ variant: "secondary" })}>
+                Import
+              </Link>
+            ) : null}
           </div>
         }
       />
@@ -113,7 +126,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
 
       <div className="space-y-4">
         <DtrTotalsBar totals={dtr.totals} />
-        <DtrTable rows={dtr.rows} punchLinks={punchLinks} />
+        <DtrTable rows={dtr.rows} punchLinks={punchLinks} fix={pendingFix ? { from: fixFrom, to: fixTo, pending: pendingFix } : undefined} />
       </div>
     </>
   );

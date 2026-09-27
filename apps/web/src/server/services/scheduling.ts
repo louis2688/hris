@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma, type Prisma } from "@hris/db";
-import { addDaysIso, DEFAULT_TIMEZONE, zonedParts, type RosterSaveInput, type SessionUser, type SwapRequestInput } from "@hris/shared";
+import { addDaysIso, DEFAULT_TIMEZONE, zonedParts, type AvailabilityInput, type RosterSaveInput, type SessionUser, type ShiftChangeInput, type SwapRequestInput } from "@hris/shared";
 import { isStaff, scopeWhere } from "../authz";
 import { AuthError } from "../auth/session";
 import { audit, notify } from "./audit";
@@ -80,11 +80,11 @@ export async function roster(u: SessionUser, weekStart: string) {
     }),
     prisma.workShift.findMany({ orderBy: { startTime: "asc" }, select: { id: true, name: true, startTime: true, endTime: true } }),
   ]);
-  const sched = await effectiveSchedule(emps.map((e) => e.id), weekStart, to);
+  const [sched, avail] = await Promise.all([effectiveSchedule(emps.map((e) => e.id), weekStart, to), availabilityFor(emps.map((e) => e.id))]);
   return {
     days: datesOf(weekStart, to),
     shifts,
-    rows: emps.map((e) => ({ ...e, editable: isStaff(u) || e.managerId === u.employeeId, days: sched.get(e.id) ?? [] })),
+    rows: emps.map((e) => ({ ...e, editable: isStaff(u) || e.managerId === u.employeeId, days: sched.get(e.id) ?? [], availability: avail.get(e.id) ?? {} })),
   };
 }
 
@@ -255,4 +255,98 @@ export async function listSwaps(u: SessionUser) {
     return { id: r.id, date, reason: r.reason, status: r.status, accepted: !!r.targetAcceptedAt, requesterId: r.requesterId, targetId: r.targetId, requester: nameOf(r.requester), target: nameOf(r.target), requesterShift: on(r.requesterId), targetShift: on(r.targetId) };
   };
   return { mine: mine.map(shape), toApprove: toApprove.map(shape) };
+}
+
+// ---------- Shift change requests ----------
+
+export async function requestShiftChange(u: SessionUser, d: ShiftChangeInput) {
+  if (!u.employeeId) throw new AppError("No employee record linked to this account");
+  if (d.from < manilaToday()) throw new AppError("Pick today or a future date");
+  const shiftId = d.shiftId === "REST" ? null : d.shiftId;
+  if (shiftId && !(await prisma.workShift.count({ where: { id: shiftId } }))) throw new AppError("Unknown shift");
+  const dup = await prisma.shiftChangeRequest.count({ where: { employeeId: u.employeeId, status: "PENDING", from: { lte: new Date(d.to) }, to: { gte: new Date(d.from) } } });
+  if (dup) throw conflict("You already have a pending shift change for those dates");
+  const row = await prisma.shiftChangeRequest.create({ data: { employeeId: u.employeeId, from: new Date(d.from), to: new Date(d.to), shiftId, reason: d.reason }, include: { employee: person, shift: { select: { name: true } } } });
+  await audit(u.id, "shiftchange.request", "ShiftChangeRequest", row.id, { after: row });
+  const mgr = row.employee.managerId ? await prisma.employee.findUnique({ where: { id: row.employee.managerId }, select: { userId: true } }) : null;
+  const to = mgr?.userId ? [mgr.userId] : (await prisma.user.findMany({ where: { role: { in: ["HR", "ADMIN"] }, isActive: true }, select: { id: true } })).map((x) => x.id);
+  await Promise.all(to.map((id) => notify(id, `Shift change request from ${nameOf(row.employee)}`, `${row.shift?.name ?? "Rest day"}, ${d.from} to ${d.to}`, "/schedule")));
+  return row;
+}
+
+async function loadChange(id: string) {
+  const r = await prisma.shiftChangeRequest.findUnique({ where: { id }, include: { employee: person, shift: { select: { name: true } } } });
+  if (!r) throw notFound("Shift change request");
+  if (r.status !== "PENDING") throw new AppError("This request is already closed");
+  return r;
+}
+
+/** Manager/HR approval writes a ShiftAssignment for every date in the range. */
+export async function decideShiftChange(u: SessionUser, id: string, approve: boolean) {
+  const r = await loadChange(id);
+  if (r.employeeId === u.employeeId) throw new AuthError("You can't approve your own request", 403);
+  if (!isStaff(u) && (!u.employeeId || r.employee.managerId !== u.employeeId)) throw new AuthError("Only their manager or HR can decide", 403);
+  const decided = { status: approve ? ("APPROVED" as const) : ("REJECTED" as const), approverId: u.employeeId, decidedAt: new Date() };
+  const dates = datesOf(iso(r.from), iso(r.to));
+  await prisma.$transaction(async (tx) => {
+    const res = await tx.shiftChangeRequest.updateMany({ where: { id, status: "PENDING" }, data: decided });
+    if (!res.count) throw conflict("Someone else just decided this request");
+    if (!approve) return;
+    for (const date of dates) {
+      const key = { employeeId: r.employeeId, date: new Date(date) };
+      await tx.shiftAssignment.upsert({ where: { employeeId_date: key }, create: { ...key, shiftId: r.shiftId, note: "Shift change request" }, update: { shiftId: r.shiftId, note: "Shift change request" } });
+    }
+  });
+  await audit(u.id, approve ? "shiftchange.approve" : "shiftchange.reject", "ShiftChangeRequest", id, { after: { ...decided, dates: dates.length } });
+  await notify(r.employee.userId, approve ? "Shift change approved" : "Shift change rejected", `${r.shift?.name ?? "Rest day"}, ${iso(r.from)} to ${iso(r.to)}`, "/schedule");
+}
+
+export async function cancelShiftChange(u: SessionUser, id: string) {
+  const r = await loadChange(id);
+  if (r.employeeId !== u.employeeId) throw new AuthError("Only the requester can cancel", 403);
+  await prisma.shiftChangeRequest.update({ where: { id }, data: { status: "CANCELLED", decidedAt: new Date() } });
+  await audit(u.id, "shiftchange.cancel", "ShiftChangeRequest", id);
+}
+
+export async function listShiftChanges(u: SessionUser) {
+  const include = { employee: person, shift: { select: { name: true, startTime: true, endTime: true } } } as const;
+  const [mine, toApprove] = await Promise.all([
+    u.employeeId ? prisma.shiftChangeRequest.findMany({ where: { employeeId: u.employeeId }, include, orderBy: { createdAt: "desc" }, take: 10 }) : [],
+    u.role === "EMPLOYEE"
+      ? []
+      : prisma.shiftChangeRequest.findMany({ where: { status: "PENDING", NOT: { employeeId: u.employeeId ?? "-" }, ...(isStaff(u) ? {} : { employee: { managerId: u.employeeId ?? "-" } }) }, include, orderBy: { from: "asc" }, take: 50 }),
+  ]);
+  const shape = (r: (typeof mine)[number]) => ({
+    id: r.id,
+    from: iso(r.from),
+    to: iso(r.to),
+    shift: r.shift ? `${r.shift.name} ${r.shift.startTime}-${r.shift.endTime}` : "Rest day",
+    reason: r.reason,
+    status: r.status,
+    employee: nameOf(r.employee),
+  });
+  return { mine: mine.map(shape), toApprove: toApprove.map(shape) };
+}
+
+// ---------- Availability ----------
+
+export type WeekAvailability = Record<number, { fromTime: string | null; toTime: string | null }>;
+
+/** Weekday -> window per employee (null times = unavailable that day; missing weekday = any time). */
+export async function availabilityFor(employeeIds: string[]) {
+  const rows = await prisma.availability.findMany({ where: { employeeId: { in: employeeIds } }, select: { employeeId: true, weekday: true, fromTime: true, toTime: true } });
+  const m = new Map<string, WeekAvailability>();
+  for (const r of rows) (m.get(r.employeeId) ?? m.set(r.employeeId, {}).get(r.employeeId)!)[r.weekday] = { fromTime: r.fromTime, toTime: r.toTime };
+  return m;
+}
+
+export async function saveAvailability(u: SessionUser, d: AvailabilityInput) {
+  if (!u.employeeId) throw new AppError("No employee record linked to this account");
+  const employeeId = u.employeeId;
+  const days = [...new Map(d.days.map((x) => [x.weekday, x])).values()];
+  await prisma.$transaction([
+    prisma.availability.deleteMany({ where: { employeeId } }),
+    prisma.availability.createMany({ data: days.map((x) => ({ employeeId, weekday: x.weekday, fromTime: x.fromTime, toTime: x.toTime })) }),
+  ]);
+  await audit(u.id, "availability.save", "Availability", null, { after: days });
 }

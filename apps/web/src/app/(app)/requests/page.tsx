@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { CalendarRange, ChevronRight, ClockAlert, Coins, Sunset } from "lucide-react";
 import { requireSession } from "@/server/auth/session";
 import { listMine, pendingFor } from "@/server/services/requests";
 import { Card, EmptyState } from "@/components/ui/card";
@@ -9,6 +9,13 @@ import { toRows } from "./_ui/list-page";
 import { KINDS, RequestList, RequestsHeader } from "./_ui/shared";
 
 export const metadata: Metadata = { title: "Requests" };
+
+const TIME_TILES = [
+  { href: "/attendance/corrections?new=1", label: "Attendance correction", blurb: "Missed punch, WFH or official business", icon: ClockAlert },
+  { href: "/me/leave?compoff=1", label: "Comp-off", blurb: "Leave credit for a rest day you worked", icon: Sunset },
+  { href: "/schedule?change=1", label: "Shift change", blurb: "Different shift or rest day", icon: CalendarRange },
+  { href: "/me/leave?encash=1", label: "Leave encashment", blurb: "Convert unused leave to cash", icon: Coins },
+];
 
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const user = await requireSession();
@@ -36,6 +43,23 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                   <div className="min-w-0">
                     <p className="flex items-center gap-1 text-sm font-semibold text-ink">
                       New {short.toLowerCase()} <ChevronRight className="size-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">{blurb}</p>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {TIME_TILES.map(({ href, label, blurb, icon: Icon }) => (
+              <Link key={href} href={href} className="group">
+                <Card className="flex h-full flex-col gap-3 p-4 transition-shadow group-hover:shadow-float">
+                  <span className="flex size-9 items-center justify-center rounded-full bg-bone text-ink" aria-hidden>
+                    <Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1 text-sm font-semibold text-ink">
+                      {label} <ChevronRight className="size-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5" />
                     </p>
                     <p className="mt-0.5 text-xs text-slate-500">{blurb}</p>
                   </div>

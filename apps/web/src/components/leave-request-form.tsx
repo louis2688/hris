@@ -19,6 +19,7 @@ export function LeaveRequestForm({
   holidays,
   employees,
   defaultEmployeeId,
+  blocks = [],
   onDone,
 }: {
   types: LeaveTypeOpt[];
@@ -27,6 +28,8 @@ export function LeaveRequestForm({
   /** HR/Admin only: file on behalf of someone. */
   employees?: EmployeeOpt[];
   defaultEmployeeId?: string;
+  /** Upcoming leave block dates (ISO) that apply to the requester. */
+  blocks?: { name: string; from: string; to: string }[];
   onDone?: () => void;
 }) {
   const today = todayISO();
@@ -41,6 +44,7 @@ export function LeaveRequestForm({
   const days = start && end ? countLeaveDays(start, end, sp, ep, { holidays }) : 0;
   const single = start === end;
   const over = !!(type?.isPaid && bal && days > bal.available);
+  const blocked = blocks.find((b) => b.from <= end && b.to >= start);
 
   return (
     <ActionForm action={createLeaveRequestAction} submitLabel="Submit request" onSuccess={onDone}>
@@ -122,7 +126,20 @@ export function LeaveRequestForm({
           </>
         )}
       </div>
-      <div className={`rounded-lg px-3 py-2 text-sm ${over ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-700"}`}>
+      {blocks.length ? (
+        <div className={`rounded-lg px-3 py-2 text-xs ${blocked ? "bg-tone-red-bg text-tone-red-fg" : "bg-tone-amber-bg text-tone-amber-fg"}`} role={blocked ? "alert" : undefined}>
+          <strong className="font-semibold">{blocked ? `Blocked: ${blocked.name}` : "Leave is blocked on"}</strong>
+          {blocked ? " - pick other dates." : null}
+          <ul className="mt-0.5">
+            {blocks.slice(0, 3).map((b) => (
+              <li key={`${b.from}${b.name}`}>
+                {b.from === b.to ? b.from : `${b.from} to ${b.to}`} · {b.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <div className={`rounded-lg px-3 py-2 text-sm ${over ? "bg-tone-red-bg text-tone-red-fg" : "bg-slate-50 text-slate-700"}`}>
         <strong>{days}</strong> working day{days === 1 ? "" : "s"} requested
         {bal ? ` · ${bal.available} available` : ""}
         {over ? " · exceeds your balance" : ""}

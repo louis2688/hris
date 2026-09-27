@@ -25,6 +25,10 @@ export const leaveTypeSchema = z
   defaultDays: z.coerce.number().min(0).max(365).default(0),
   maxConsecutiveDays: z.coerce.number().int().min(0).max(365).optional().or(z.literal("")).transform((v) => (v === "" || v === undefined ? undefined : Number(v))),
   isActive: z.boolean().default(true),
+  /** Blank = full entitlement upfront */
+  accrualPerMonth: z.coerce.number().min(0.01).max(31).optional().or(z.literal("")).transform((v) => (v === "" || v === undefined ? null : Number(v))),
+  allowEncashment: z.boolean().default(false),
+  isCompensatory: z.boolean().default(false),
   level1: approverLevel,
   level2: approverLevel,
   level3: approverLevel,

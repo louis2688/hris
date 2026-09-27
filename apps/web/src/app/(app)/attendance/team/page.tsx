@@ -38,6 +38,14 @@ export default async function TeamAttendancePage() {
               Anomalies
               <span className={`rounded-full px-1.5 text-xs tabular-nums ${high ? "bg-red-600 text-white" : "bg-bone text-ink"}`}>{anomalies.length}</span>
             </Link>
+            <Link href="/attendance/corrections" className={buttonVariants({ variant: "secondary" })}>
+              Corrections
+            </Link>
+            {isStaff(user) ? (
+              <Link href="/attendance/import" className={buttonVariants({ variant: "secondary" })}>
+                Import
+              </Link>
+            ) : null}
             <ManualPunchDialog employees={rows.map((r) => ({ id: r.id, name: `${fullName(r)} (${r.employeeCode})` }))} />
           </>
         }

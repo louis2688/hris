@@ -3,12 +3,15 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { addDaysIso } from "@hris/shared";
 import { gate } from "@/server/auth/session";
-import { listSwaps, manilaToday, mondayOf, mySchedule, roster, teammates } from "@/server/services/scheduling";
+import { availabilityFor, listShiftChanges, listSwaps, manilaToday, mondayOf, mySchedule, roster, teammates } from "@/server/services/scheduling";
+import { listShifts } from "@/server/services/attendance";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn, fmtDate, fullName } from "@/lib/utils";
 import { Roster } from "./roster";
 import { Swaps } from "./swaps";
+import { ShiftChanges } from "./changes";
+import { Availability } from "./availability";
 
 export const metadata: Metadata = { title: "Schedule" };
 
@@ -18,11 +21,14 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const today = manilaToday();
   const week = mondayOf(/^\d{4}-\d{2}-\d{2}$/.test(sp.week ?? "") ? sp.week! : today);
   const canRoster = user.role !== "EMPLOYEE";
-  const [mine, swaps, mates, grid] = await Promise.all([
+  const [mine, swaps, mates, grid, changes, shifts, avail] = await Promise.all([
     user.employeeId ? mySchedule(user.employeeId, today) : [],
     listSwaps(user),
     teammates(user),
     canRoster ? roster(user, week) : null,
+    listShiftChanges(user),
+    listShifts(),
+    user.employeeId ? availabilityFor([user.employeeId]) : null,
   ]);
   const weekLabel = `${fmtDate(week, "d MMM")} - ${fmtDate(addDaysIso(week, 6), "d MMM yyyy")}`;
   const nav = (w: string) => `/schedule?week=${w}`;
@@ -32,7 +38,8 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
       <PageHeader title="Schedule" description={canRoster ? "Your shifts, swap requests, and your team's weekly roster." : "Your shifts for the next two weeks and swaps with teammates."} />
 
       <div className="grid gap-6 lg:grid-cols-5">
-        <Card className="lg:col-span-2">
+        <div className="space-y-6 lg:col-span-2">
+        <Card>
           <CardHeader title="My schedule" description="Next 14 days" />
           {mine.length === 0 ? (
             <EmptyState title="No employee profile linked" description="Ask HR to link your login to an employee record." />
@@ -65,8 +72,10 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             </ol>
           )}
         </Card>
+        {user.employeeId ? <Availability initial={avail?.get(user.employeeId) ?? {}} /> : null}
+        </div>
 
-        <div className="lg:col-span-3">
+        <div className="space-y-6 lg:col-span-3">
           <Swaps
             meId={user.employeeId}
             today={today}
@@ -74,6 +83,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             mine={swaps.mine}
             toApprove={swaps.toApprove}
           />
+          <ShiftChanges canRequest={!!user.employeeId} today={today} shifts={shifts.map((s) => ({ id: s.id, name: s.name, startTime: s.startTime, endTime: s.endTime }))} mine={changes.mine} toApprove={changes.toApprove} />
         </div>
       </div>
 
@@ -81,7 +91,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         <Card className="mt-6">
           <CardHeader
             title="Team roster"
-            description={`${weekLabel} · bold cells differ from the usual shift`}
+            description={`${weekLabel} · bold cells differ from the usual shift · a dot marks a shift outside the person's availability`}
             action={
               <div className="flex items-center gap-1">
                 <Link href={nav(addDaysIso(week, -7))} className={buttonVariants({ variant: "secondary", size: "icon-sm" })} aria-label="Previous week">
@@ -102,7 +112,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             today={today}
             days={grid.days}
             shifts={grid.shifts}
-            rows={grid.rows.map((r) => ({ id: r.id, name: fullName(r), code: r.employeeCode, dept: r.department?.name ?? null, editable: r.editable, days: r.days }))}
+            rows={grid.rows.map((r) => ({ id: r.id, name: fullName(r), code: r.employeeCode, dept: r.department?.name ?? null, editable: r.editable, days: r.days, availability: r.availability }))}
           />
         </Card>
       ) : null}

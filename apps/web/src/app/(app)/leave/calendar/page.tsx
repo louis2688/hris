@@ -4,12 +4,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { eachDay, toISODate } from "@hris/shared";
 import { gate } from "@/server/auth/session";
 import { visibleEmployeeIds } from "@/server/authz";
-import { leaveInWindow } from "@/server/services/leave";
+import { blocksFor, leaveInWindow } from "@/server/services/leave";
 import { holidayDatesFor } from "@/server/services/org";
 import { Card, PageHeader } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import { cn, fullName } from "@/lib/utils";
+import { cn, fmtDate, fullName } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Leave calendar" };
 
@@ -22,8 +22,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const last = new Date(Date.UTC(y, mo, 0));
   const days = eachDay(toISODate(first), toISODate(last));
   const scope = await visibleEmployeeIds(user);
-  const [requests, holidays] = await Promise.all([leaveInWindow(first, last, scope), holidayDatesFor(null, first, last)]);
+  const [requests, holidays, blocks] = await Promise.all([leaveInWindow(first, last, scope), holidayDatesFor(null, first, last), blocksFor(null, first, last)]);
   const hol = new Set(holidays);
+  const blocked = new Map<string, string>();
+  for (const b of blocks) for (const d of eachDay(toISODate(b.from), toISODate(b.to))) blocked.set(d, [blocked.get(d), `${b.name}${b.department ? ` (${b.department.name})` : ""}`].filter(Boolean).join(", "));
 
   // Group by employee
   const byEmp = new Map<string, { emp: (typeof requests)[number]["employee"]; days: Map<string, (typeof requests)[number]> }>();
@@ -66,9 +68,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                 const dt = new Date(d);
                 const wk = dt.getUTCDay() === 0 || dt.getUTCDay() === 6;
                 return (
-                  <th key={d} className={cn("min-w-[28px] px-0 py-1.5 text-center font-normal", wk || hol.has(d) ? "text-slate-300" : "text-slate-600", d === todayISO && "text-brand-700 font-semibold")} title={hol.has(d) ? "Public holiday" : undefined}>
+                  <th key={d} className={cn("min-w-[28px] px-0 py-1.5 text-center font-normal", wk || hol.has(d) ? "text-slate-300" : "text-slate-600", d === todayISO && "text-brand-700 font-semibold")} title={blocked.has(d) ? `Leave blocked: ${blocked.get(d)}` : hol.has(d) ? "Public holiday" : undefined}>
                     <span className="block text-[10px] uppercase">{"SMTWTFS"[dt.getUTCDay()]}</span>
                     {dt.getUTCDate()}
+                    <span className={cn("mx-auto mt-0.5 block h-1 w-4 rounded-full", blocked.has(d) ? "bg-tone-red-fg" : "bg-transparent")} aria-hidden />
+                    {blocked.has(d) ? <span className="sr-only">Leave blocked</span> : null}
                   </th>
                 );
               })}
@@ -95,7 +99,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                     const dt = new Date(d);
                     const off = dt.getUTCDay() === 0 || dt.getUTCDay() === 6 || hol.has(d);
                     return (
-                      <td key={d} className={cn("h-9 p-0.5", off && "bg-slate-50/70")}>
+                      <td key={d} className={cn("h-9 p-0.5", off && "bg-slate-50/70", !off && blocked.has(d) && "bg-tone-red-bg/60")}>
                         {r ? (
                           <Link
                             href={`/leave/${r.id}`}
@@ -115,7 +119,17 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           </tbody>
         </table>
       </Card>
-      <p className="mt-3 text-xs text-slate-500">Solid = approved, striped = pending. Grey columns are weekends and public holidays.</p>
+      <p className="mt-3 text-xs text-slate-500">Solid = approved, striped = pending. Grey columns are weekends and public holidays; red-marked days are blocked for leave.</p>
+      {blocks.length ? (
+        <ul className="mt-2 flex flex-wrap gap-2 text-xs" aria-label="Blocked dates">
+          {blocks.map((b) => (
+            <li key={b.id} className="rounded-full bg-tone-red-bg px-2.5 py-1 font-medium text-tone-red-fg">
+              {toISODate(b.from) === toISODate(b.to) ? fmtDate(b.from, "d MMM") : `${fmtDate(b.from, "d MMM")} - ${fmtDate(b.to, "d MMM")}`} · {b.name}
+              {b.department ? ` (${b.department.name})` : ""}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </>
   );
 }

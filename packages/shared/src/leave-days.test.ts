@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countLeaveDays } from "./leave-days";
+import { accruedDays, completedAccrualMonths, countLeaveDays } from "./leave-days";
 
 describe("countLeaveDays", () => {
   it("counts a full working week as 5", () => {
@@ -25,5 +25,32 @@ describe("countLeaveDays", () => {
   });
   it("returns 0 when end before start", () => {
     expect(countLeaveDays("2026-10-10", "2026-10-01")).toBe(0);
+  });
+});
+
+describe("completedAccrualMonths / accruedDays", () => {
+  it("counts months completed since Jan 1", () => {
+    expect(completedAccrualMonths(2026, "2020-05-10", "2026-01-31")).toBe(0);
+    expect(completedAccrualMonths(2026, "2020-05-10", "2026-02-01")).toBe(1);
+    expect(completedAccrualMonths(2026, "2020-05-10", "2026-09-27")).toBe(8);
+  });
+  it("starts at the hire date for new hires", () => {
+    expect(completedAccrualMonths(2026, "2026-03-15", "2026-04-14")).toBe(0);
+    expect(completedAccrualMonths(2026, "2026-03-15", "2026-04-15")).toBe(1);
+    expect(completedAccrualMonths(2026, "2026-03-15", "2026-09-14")).toBe(5);
+  });
+  it("uses the last day of short months", () => {
+    expect(completedAccrualMonths(2026, "2026-01-31", "2026-02-27")).toBe(0);
+    expect(completedAccrualMonths(2026, "2026-01-31", "2026-02-28")).toBe(1);
+  });
+  it("caps at the end of the year and is 0 before the start", () => {
+    expect(completedAccrualMonths(2025, "2020-01-01", "2026-06-01")).toBe(12);
+    expect(completedAccrualMonths(2025, "2025-12-15", "2026-06-01")).toBe(0);
+    expect(completedAccrualMonths(2027, "2020-01-01", "2026-06-01")).toBe(0);
+  });
+  it("accrues and caps at the entitlement", () => {
+    expect(accruedDays(15, 1.25, 2026, "2020-01-01", "2026-09-27")).toBe(10);
+    expect(accruedDays(15, 1.25, 2025, "2020-01-01", "2026-09-27")).toBe(15);
+    expect(accruedDays(12, 1.25, 2025, "2020-01-01", "2026-09-27")).toBe(12);
   });
 });

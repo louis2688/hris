@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { WEEKDAY_SHORT } from "@hris/shared";
+import { outsideAvailability, WEEKDAY_SHORT } from "@hris/shared";
 import type { ScheduleDay } from "@/server/services/scheduling";
 import { applyDefaultsAction, copyLastWeekAction, saveRosterAction } from "@/server/actions/scheduling";
 import { ConfirmButton } from "@/components/action-form";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-type Row = { id: string; name: string; code: string; dept: string | null; editable: boolean; days: ScheduleDay[] };
+type Row = { id: string; name: string; code: string; dept: string | null; editable: boolean; days: ScheduleDay[]; availability?: Record<number, { fromTime: string | null; toTime: string | null }> };
 type Shift = { id: string; name: string; startTime: string; endTime: string };
 
 const valueOf = (d: ScheduleDay) => (d.override ? (d.shift?.id ?? "REST") : "");
@@ -61,11 +61,16 @@ export function Roster({ week, today, days, shifts, rows }: { week: string; toda
                   const v = cells.get(key) ?? "";
                   const dirty = initial.get(key) !== v;
                   const cur = v === "REST" ? null : v ? (shifts.find((x) => x.id === v) ?? null) : d.base;
+                  const outside = outsideAvailability(cur, r.availability?.[new Date(`${d.date}T00:00:00Z`).getUTCDay()]);
                   return (
-                    <td key={d.date} className="px-1 py-1.5">
+                    <td key={d.date} className="relative px-1 py-1.5">
+                      {outside ? (
+                        <span className="pointer-events-none absolute right-0.5 top-0.5 z-[1] size-2 rounded-full bg-slate-500 ring-2 ring-card" title="Outside availability" aria-hidden />
+                      ) : null}
                       <select
                         aria-label={`${r.name} ${d.date}`}
-                        title={[cur ? `${cur.name} ${cur.startTime}-${cur.endTime}` : "Rest day", d.holiday ? `Holiday: ${d.holiday.name}` : ""].filter(Boolean).join(" · ")}
+                        title={[cur ? `${cur.name} ${cur.startTime}-${cur.endTime}` : "Rest day", d.holiday ? `Holiday: ${d.holiday.name}` : "", outside ? "Outside availability" : ""].filter(Boolean).join(" · ")}
+                        data-outside={outside || undefined}
                         style={{ backgroundPosition: "right 6px center", backgroundSize: 12 }}
                         disabled={!r.editable || saving}
                         value={v}

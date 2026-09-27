@@ -2,7 +2,10 @@ import "server-only";
 import { cache } from "react";
 import { prisma, Prisma } from "@hris/db";
 import {
+  accruedDays,
   countLeaveDays,
+  DEFAULT_TIMEZONE,
+  zonedParts,
   parseISODate,
   type CreateLeaveRequestInput,
   type DecideLeaveRequestInput,
@@ -41,6 +44,9 @@ export async function saveLeaveType(actor: SessionUser, d: LeaveTypeInput, id?: 
     maxConsecutiveDays: d.maxConsecutiveDays ?? null,
     isActive: d.isActive,
     approvalChain: d.approvalChain,
+    accrualPerMonth: d.accrualPerMonth,
+    allowEncashment: d.allowEncashment,
+    isCompensatory: d.isCompensatory,
   };
   try {
     const row = id ? await prisma.leaveType.update({ where: { id }, data }) : await prisma.leaveType.create({ data });
@@ -93,11 +99,15 @@ export async function bulkAssignEntitlements(actor: SessionUser, leaveTypeId: st
   return count;
 }
 
-export async function getBalances(employeeId: string, year: number): Promise<LeaveBalance[]> {
+/** `earned` is set for accruing types (accrualPerMonth): days earned so far this year, replacing `entitled` in `available`. */
+export type Balance = LeaveBalance & { earned: number | null };
+
+export async function getBalances(employeeId: string, year: number): Promise<Balance[]> {
   const yearStart = new Date(Date.UTC(year, 0, 1));
   const yearEnd = new Date(Date.UTC(year, 11, 31));
-  const [types, entitlements, usage] = await Promise.all([
+  const [types, emp, entitlements, usage] = await Promise.all([
     listLeaveTypes(true),
+    prisma.employee.findUnique({ where: { id: employeeId }, select: { hireDate: true } }),
     prisma.leaveEntitlement.findMany({ where: { employeeId, year } }),
     prisma.leaveRequest.groupBy({
       by: ["leaveTypeId", "status"],
@@ -112,6 +122,7 @@ export async function getBalances(employeeId: string, year: number): Promise<Lea
     const entitled = num(ent?.entitledDays);
     const carriedOver = num(ent?.carriedOver);
     const adjustment = num(ent?.adjustment);
+    const earned = t.accrualPerMonth != null && emp ? accruedDays(entitled, num(t.accrualPerMonth), year, emp.hireDate.toISOString().slice(0, 10), zonedParts(new Date(), DEFAULT_TIMEZONE).date) : null;
     return {
       leaveTypeId: t.id,
       leaveTypeName: t.name,
@@ -123,7 +134,8 @@ export async function getBalances(employeeId: string, year: number): Promise<Lea
       adjustment,
       used,
       pending,
-      available: entitled + carriedOver + adjustment - used - pending,
+      earned,
+      available: (earned ?? entitled) + carriedOver + adjustment - used - pending,
     };
   });
 }
@@ -221,7 +233,7 @@ export async function createLeaveRequest(actor: SessionUser, d: CreateLeaveReque
 
   const [type, employee] = await Promise.all([
     prisma.leaveType.findUnique({ where: { id: d.leaveTypeId } }),
-    prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null }, select: { id: true, firstName: true, lastName: true, preferredName: true, manager: { select: { user: { select: { id: true } } } } } }),
+    prisma.employee.findFirst({ where: { id: employeeId, deletedAt: null }, select: { id: true, firstName: true, lastName: true, preferredName: true, departmentId: true, manager: { select: { user: { select: { id: true } } } } } }),
   ]);
   if (!type || !type.isActive) throw notFound("Leave type");
   if (!employee) throw notFound("Employee");
@@ -233,6 +245,11 @@ export async function createLeaveRequest(actor: SessionUser, d: CreateLeaveReque
   const totalDays = countLeaveDays(d.startDate, d.endDate, d.startDayPart, d.endDayPart, { holidays });
   if (totalDays <= 0) throw new AppError("The selected dates contain no working days");
   if (type.maxConsecutiveDays && totalDays > type.maxConsecutiveDays) throw new AppError(`Maximum ${type.maxConsecutiveDays} consecutive day(s) for ${type.name}`);
+
+  if (!isStaff(actor)) {
+    const block = await blockOverlapping(employee.departmentId, start, end);
+    if (block) throw new AppError(`Leave is blocked ${fmtRange(block.from, block.to)} (${block.name}). Pick other dates or ask HR.`, "BLOCKED_DATES");
+  }
 
   const overlap = await prisma.leaveRequest.findFirst({
     where: { employeeId, status: { in: ["PENDING", "APPROVED"] }, startDate: { lte: end }, endDate: { gte: start } },
@@ -367,4 +384,27 @@ export async function pendingApprovalsFor(actor: SessionUser) {
     orderBy: { createdAt: "asc" },
   });
   return rows.filter((r) => canDecide(actor, r));
+}
+
+// ---------- Block dates ----------
+
+const fmtRange = (from: Date, to: Date) => {
+  const f = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return from.getTime() === to.getTime() ? `on ${f(from)}` : `from ${f(from)} to ${f(to)}`;
+};
+
+/** Company-wide blocks plus the department's (null department = company-wide only). */
+const blockWhere = (departmentId: string | null | undefined): Prisma.LeaveBlockDateWhereInput => ({ OR: [{ departmentId: null }, ...(departmentId ? [{ departmentId }] : [])] });
+
+export const blockOverlapping = (departmentId: string | null | undefined, from: Date, to: Date) =>
+  prisma.leaveBlockDate.findFirst({ where: { ...blockWhere(departmentId), from: { lte: to }, to: { gte: from } }, orderBy: { from: "asc" } });
+
+/** Blocks ending on/after `from` that apply to an employee (all blocks when employeeId is null). */
+export async function blocksFor(employeeId: string | null, from: Date, to?: Date) {
+  const dept = employeeId ? (await prisma.employee.findUnique({ where: { id: employeeId }, select: { departmentId: true } }))?.departmentId : undefined;
+  return prisma.leaveBlockDate.findMany({
+    where: { ...(employeeId ? blockWhere(dept) : {}), to: { gte: from }, ...(to ? { from: { lte: to } } : {}) },
+    include: { department: { select: { name: true } } },
+    orderBy: { from: "asc" },
+  });
 }

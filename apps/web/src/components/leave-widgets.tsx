@@ -6,15 +6,16 @@ import { Avatar } from "@/components/ui/avatar";
 import { LeaveStatusBadge, LeaveTypeDot } from "@/components/status-badge";
 import { fmtDate, fmtDays, fullName } from "@/lib/utils";
 
-export function BalanceCards({ balances }: { balances: LeaveBalance[] }) {
+/** `earned` (accruing types) caps the total at what has been earned so far this year. */
+export function BalanceCards({ balances }: { balances: (LeaveBalance & { earned?: number | null })[] }) {
   if (balances.length === 0) return <p className="text-sm text-slate-500">No leave types configured yet.</p>;
   return (
     <div className="stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {balances.map((b) => {
-        const total = b.entitled + b.carriedOver + b.adjustment;
+        const total = (b.earned ?? b.entitled) + b.carriedOver + b.adjustment;
         const pct = total > 0 ? Math.min(100, Math.round(((b.used + b.pending) / total) * 100)) : 0;
         return (
-          <Card key={b.leaveTypeId} className="p-4">
+          <Card key={b.leaveTypeId} className="p-4" data-code={b.leaveTypeCode}>
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium">
@@ -22,7 +23,7 @@ export function BalanceCards({ balances }: { balances: LeaveBalance[] }) {
                 </p>
                 {total > 0 ? (
                   <p className="mt-2 text-2xl font-semibold tracking-tight">
-                    {b.available}
+                    <span data-available>{b.available}</span>
                     <span className="ml-1 text-sm font-normal text-slate-500">of {total} left</span>
                   </p>
                 ) : (
@@ -33,6 +34,11 @@ export function BalanceCards({ balances }: { balances: LeaveBalance[] }) {
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
               <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: b.color }} />
             </div>
+            {b.earned != null ? (
+              <p className="mt-2 text-xs font-medium text-ink">
+                Earned so far: {b.earned} of {b.entitled}
+              </p>
+            ) : null}
             <p className="mt-2 text-xs text-slate-500">
               {b.used} used · {b.pending} pending
               {b.carriedOver ? ` · ${b.carriedOver} carried over` : ""}
