@@ -95,7 +95,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
         ) : null}
 
         {staff ? (
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <Card className="h-fit">
               <CardHeader title="Cycles" />
               {cycles.length === 0 ? (
@@ -104,7 +104,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
                 <ul className="divide-y divide-slate-100">
                   {cycles.map((c) => (
                     <li key={c.id}>
-                      <Link href={`/performance?cycle=${c.id}`} className={cn("block px-5 py-3 hover:bg-slate-50", cycle?.id === c.id && "bg-brand-50/50")}>
+                      <Link href={`/performance?cycle=${c.id}`} className={cn("block px-5 py-3 hover:bg-slate-50", cycle?.id === c.id && "bg-canvas")}>
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium">{c.name}</p>
                           <CycleBadge status={c.status} />

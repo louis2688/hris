@@ -34,7 +34,7 @@ export function EmergencyContacts({ employeeId, contacts }: { employeeId: string
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">
                   {c.name}
-                  {c.isPrimary ? <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">Primary</span> : null}
+                  {c.isPrimary ? <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium text-ink ring-1 ring-inset ring-hairline">Primary</span> : null}
                 </p>
                 <p className="text-xs text-slate-500">
                   {c.relationship} · {c.phone}

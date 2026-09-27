@@ -27,7 +27,7 @@ export function SettingsNav({ isAdmin }: { isAdmin: boolean }) {
       <ul className="flex gap-1 lg:flex-col">
         {ITEMS.filter((i) => isAdmin || !i.adminOnly).map((i) => (
           <li key={i.href}>
-            <Link href={i.href} className={cn("block whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition-colors", p.startsWith(i.href) ? "bg-white text-brand-700 shadow-card ring-1 ring-slate-900/[0.06]" : "text-slate-600 hover:bg-white/70")}>
+            <Link href={i.href} className={cn("block whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-colors", p.startsWith(i.href) ? "bg-white text-ink ring-1 ring-inset ring-hairline" : "text-slate-600 hover:bg-ink/5 hover:text-ink")}>
               {i.label}
             </Link>
           </li>

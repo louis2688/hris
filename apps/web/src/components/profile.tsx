@@ -9,12 +9,12 @@ import { cn, fmtDate, fullName } from "@/lib/utils";
 export function ProfileHero({ e, actions }: { e: EmployeeDetail; actions?: React.ReactNode }) {
   return (
     <Card className="mb-6 overflow-hidden">
-      <div className="h-20 bg-gradient-to-r from-brand-500 via-brand-400 to-sky-300" aria-hidden />
+      <div className="h-20 bg-ink" aria-hidden />
       <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <Avatar first={e.firstName} last={e.lastName} src={e.avatarUrl} size="xl" className="-mt-14 shrink-0 ring-4 ring-white shadow-card" />
+        <Avatar first={e.firstName} last={e.lastName} src={e.avatarUrl} size="xl" className="-mt-14 shrink-0 ring-4 ring-white" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight">{fullName(e)}</h1>
+            <h1 className="font-display text-[26px] font-bold leading-[1.05] tracking-[-0.02em]">{fullName(e)}</h1>
             <EmploymentStatusBadge status={e.employmentStatus} />
           </div>
           <p className="mt-0.5 text-sm text-slate-600">
@@ -35,13 +35,13 @@ export function ProfileHero({ e, actions }: { e: EmployeeDetail; actions?: React
 export function TabNav({ base, tabs, active }: { base: string; tabs: { key: string; label: string }[]; active: string }) {
   return (
     <nav className="mb-6 -mx-4 overflow-x-auto px-4 scrollbar-thin lg:mx-0 lg:px-0" aria-label="Sections">
-      <ul className="inline-flex gap-1 rounded-xl bg-slate-200/60 p-1">
+      <ul className="inline-flex gap-1 rounded-full bg-slate-100 p-1">
         {tabs.map((t) => (
           <li key={t.key}>
             <Link
               href={t.key === tabs[0]?.key ? base : `${base}?tab=${t.key}`}
               className={cn(
-                "inline-block whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                "inline-block whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
                 active === t.key ? "bg-white text-ink shadow-card" : "text-slate-600 hover:text-ink",
               )}
               aria-current={active === t.key ? "page" : undefined}
@@ -130,7 +130,7 @@ export function ProfileOverview({ e, showLinks }: { e: EmployeeDetail; showLinks
               <li key={c.id} className="flex items-center justify-between px-5 py-3 text-sm">
                 <div>
                   <p className="font-medium">
-                    {c.name} {c.isPrimary ? <span className="ml-1 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">Primary</span> : null}
+                    {c.name} {c.isPrimary ? <span className="ml-1 rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium text-ink ring-1 ring-inset ring-hairline">Primary</span> : null}
                   </p>
                   <p className="text-xs text-slate-500">{c.relationship}</p>
                 </div>

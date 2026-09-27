@@ -59,7 +59,7 @@ export function Passkeys({ keys }: { keys: Key[] }) {
       <Card>
         <CardBody className="space-y-4">
           <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-bone text-ink">
               <Fingerprint className="size-5" />
             </div>
             <p className="text-sm text-slate-600">

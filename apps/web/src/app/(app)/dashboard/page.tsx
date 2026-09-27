@@ -55,7 +55,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           {manager && pending.length > 0 ? (
             <div>
@@ -109,7 +109,7 @@ export default async function DashboardPage() {
                         <span className="text-slate-500">{d._count.employees}</span>
                       </div>
                       <div className="h-2 rounded-full bg-slate-100">
-                        <div className="h-2 rounded-full bg-brand-500" style={{ width: `${pct}%` }} />
+                        <div className="h-2 rounded-full bg-ink" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );

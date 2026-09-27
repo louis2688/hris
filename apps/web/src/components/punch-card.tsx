@@ -88,9 +88,9 @@ export function PunchCard({ clockedIn, since, shiftLabel, timeZone, policy, hasP
 
   return (
     <Card className="overflow-hidden">
-      <div className={cn("bg-gradient-to-br p-6 text-white", clockedIn ? "from-emerald-500 to-emerald-600" : "from-brand-500 to-brand-600")}>
+      <div className={cn("p-6 text-on-dark", clockedIn ? "bg-ink" : "hero-mesh")}>
         <p className="text-sm/5 opacity-85">{now ? fmt(now, { weekday: "long", month: "long", day: "numeric" }) : " "}</p>
-        <p className="mt-1 text-5xl font-bold tracking-tight tabular-nums" suppressHydrationWarning>
+        <p className="mt-1 font-display text-6xl font-bold leading-none tracking-[-0.03em] tabular-nums" suppressHydrationWarning>
           {now ? fmt(now, { hour: "2-digit", minute: "2-digit" }) : "--:--"}
         </p>
         <p className="mt-2 text-sm opacity-90">
@@ -98,7 +98,7 @@ export function PunchCard({ clockedIn, since, shiftLabel, timeZone, policy, hasP
         </p>
       </div>
       <div className="flex flex-col gap-3 p-5">
-        <Button size="lg" className={cn("h-14 w-full text-base", clockedIn && "from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900")} onClick={punch} loading={busy}>
+        <Button size="lg" variant="brand" className="h-14 w-full text-base" onClick={punch} loading={busy}>
           {clockedIn ? <LogOut /> : <LogIn />}
           {clockedIn ? "Clock out" : "Clock in"}
         </Button>
@@ -119,7 +119,7 @@ export function PunchCard({ clockedIn, since, shiftLabel, timeZone, policy, hasP
             </span>
           ) : null}
           {!usePasskey && policy.requirePasskey === false ? (
-            <a href="/me/security" className="text-brand-600 hover:underline">
+            <a href="/me/security" className="text-ink underline underline-offset-2 hover:text-slate-600">
               Set up fingerprint / Face ID
             </a>
           ) : null}

@@ -22,9 +22,9 @@ export default async function ReportsPage() {
       <PageHeader title="Reports" description={isStaff(user) ? "Company-wide reports with CSV and PDF export" : "Reports for you and your direct reports"} />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {REPORTS.map((r) => (
-          <Link key={r.href} href={r.href} className="group rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
-            <Card className="h-full p-5 transition-shadow group-hover:shadow-md">
-              <r.icon className="size-5 text-brand-500" />
+          <Link key={r.href} href={r.href} className="group rounded-2xl focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus">
+            <Card className="h-full p-5 transition-colors group-hover:ring-ink/40">
+              <r.icon className="size-5 text-ink" />
               <p className="mt-3 font-semibold text-ink">{r.title}</p>
               <p className="mt-1 text-sm text-slate-500">{r.description}</p>
             </Card>

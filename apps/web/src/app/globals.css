@@ -1,35 +1,58 @@
 @import "tailwindcss";
-@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
 
 /*
-  Design tokens (ui-ux-pro-max "SaaS boutique" direction, light-first):
-  navy ink for text and sidebar, electric blue accent with a soft gradient on
-  primary actions, green for positive states, generous radii, subtle motion.
+  Design tokens (DESIGN.md, Replicate-inspired, adapted for an app):
+  warm cream canvas, ink type, white cards on hairlines (no shadows on cream),
+  pill-shaped controls, one scarce hot-orange accent.
+  `slate-*` is remapped to warm neutrals so every page shifts at once.
 */
 @theme {
-  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --color-brand-50: #eef4ff;
-  --color-brand-100: #dbe6ff;
-  --color-brand-200: #bfd2ff;
-  --color-brand-300: #93b4ff;
-  --color-brand-400: #4d7cff;
-  --color-brand-500: #0052ff;
-  --color-brand-600: #0047e0;
-  --color-brand-700: #003bba;
-  --color-brand-800: #003296;
-  --color-brand-900: #052a73;
-  --color-brand-950: #061a47;
+  --color-brand-50: #fff1ec;
+  --color-brand-100: #ffdfd4;
+  --color-brand-200: #ffbfa8;
+  --color-brand-300: #ff946f;
+  --color-brand-400: #ff6a3d;
+  --color-brand-500: #f24a1d;
+  --color-brand-600: #ea2804;
+  --color-brand-700: #c01f00;
+  --color-brand-800: #971a03;
+  --color-brand-900: #6e1605;
+  --color-brand-950: #3d0a01;
 
-  --color-surface: #f5f7fb;
-  --color-ink: #0f172a;
-  --color-ink-muted: #475569;
+  --color-slate-50: #f3f0e8;
+  --color-slate-100: #ece8de;
+  --color-slate-200: #e2ddd0;
+  --color-slate-300: #bbbbbb;
+  --color-slate-400: #8d8d8d;
+  --color-slate-500: #646464;
+  --color-slate-600: #575757;
+  --color-slate-700: #3a3a3a;
+  --color-slate-800: #2b2b2b;
+  --color-slate-900: #202020;
+  --color-slate-950: #141414;
 
-  --radius-xl: 0.875rem;
-  --radius-2xl: 1.125rem;
+  --color-canvas: #f9f7f3;
+  --color-bone: #f3f0e8;
+  --color-hairline: rgb(32 32 32 / 0.12);
+  --color-on-dark: #fcfcfc;
+  --color-focus: rgb(59 130 246 / 0.5);
+  --color-surface: #f9f7f3;
+  --color-ink: #202020;
+  --color-ink-muted: #575757;
 
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
-  --shadow-float: 0 12px 32px -12px rgb(15 23 42 / 0.25);
+  --radius-xl: 10px;
+  --radius-2xl: 16px;
+
+  /* no drop shadows on cream: "card" elevation is a hairline */
+  --shadow-card: 0 0 0 1px rgb(32 32 32 / 0.12);
+  --shadow-float: 0 16px 40px -16px rgb(32 32 32 / 0.28), 0 0 0 1px rgb(32 32 32 / 0.06);
 
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --animate-fade-up: fade-up 0.35s var(--ease-spring) both;
@@ -48,7 +71,7 @@
 
 @layer base {
   * {
-    @apply border-slate-200;
+    @apply border-hairline;
   }
   html {
     -webkit-tap-highlight-color: transparent;
@@ -56,12 +79,17 @@
   }
   body {
     @apply bg-surface text-ink antialiased;
-    font-feature-settings: "ss01", "cv11";
+    font-feature-settings: "cv11";
   }
   h1,
   h2,
   h3 {
     letter-spacing: -0.01em;
+  }
+  @media print {
+    body {
+      background: white;
+    }
   }
   input[type="date"]::-webkit-calendar-picker-indicator {
     opacity: 0.55;
@@ -103,7 +131,23 @@
 }
 
 @utility glass {
-  background: rgb(255 255 255 / 0.72);
+  background: rgb(249 247 243 / 0.85);
   backdrop-filter: saturate(180%) blur(12px);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
+}
+
+/* Orange atmospheric mesh (DESIGN.md hero): primary core, glow mid, pink wash. Hero-only. */
+@utility hero-mesh {
+  background-color: #ea2804;
+  background-image:
+    radial-gradient(90% 120% at 105% 110%, #f4a8a0 0%, rgb(244 168 160 / 0) 60%),
+    radial-gradient(70% 100% at 80% 0%, #ff6a3d 0%, rgb(255 106 61 / 0) 70%);
+}
+
+/* Native select chevron (kept in CSS: Tailwind's scanner skips quoted SVG URLs in class names). */
+@utility select-chevron {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23575757' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  background-size: 16px;
+  background-position: right 1rem center;
+  background-repeat: no-repeat;
 }

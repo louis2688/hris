@@ -31,7 +31,7 @@ export function ReviewForm({ id, side, items, comment }: { id: string; side: "se
             {Array.from({ length: it.maxRating - it.minRating + 1 }, (_, i) => it.minRating + i).map((n) => (
               <label key={n} className="cursor-pointer">
                 <input type="radio" name={`rating:${it.id}`} value={n} defaultChecked={it.rating === n} className="peer sr-only" aria-label={`${n} of ${it.maxRating}`} />
-                <span className="flex size-10 items-center justify-center rounded-xl text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-200 transition-colors hover:bg-slate-50 peer-checked:bg-brand-500 peer-checked:text-white peer-checked:ring-brand-500 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500">
+                <span className="flex size-10 items-center justify-center rounded-full text-sm font-semibold text-slate-700 ring-1 ring-inset ring-hairline transition-colors hover:bg-canvas peer-checked:bg-ink peer-checked:text-on-dark peer-checked:ring-ink peer-focus-visible:ring-[3px] peer-focus-visible:ring-focus">
                   {n}
                 </span>
               </label>

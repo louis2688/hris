@@ -107,7 +107,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
                           </span>
                         </Link>
                       </TD>
-                      <TD className="font-mono text-xs">{e.employeeCode}</TD>
+                      <TD className="whitespace-nowrap font-mono text-xs">{e.employeeCode}</TD>
                       <TD>{e.jobTitle?.name ?? "-"}</TD>
                       <TD>{e.department?.name ?? "-"}</TD>
                       <TD>{e.manager ? fullName(e.manager) : "-"}</TD>

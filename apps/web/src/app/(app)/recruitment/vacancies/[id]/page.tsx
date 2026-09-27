@@ -43,7 +43,7 @@ export default async function VacancyPage({ params }: { params: Promise<{ id: st
                 <div className="space-y-2">
                   {list.map((c) => (
                     <Link key={c.id} href={`/recruitment/candidates/${c.id}`}>
-                      <Card className="p-3 transition-shadow hover:shadow-float">
+                      <Card className="p-3 transition-colors hover:ring-ink/40">
                         <p className="text-sm font-medium">
                           {c.firstName} {c.lastName}
                         </p>

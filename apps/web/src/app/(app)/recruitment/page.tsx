@@ -36,9 +36,9 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
   return (
     <>
       <PageHeader title="Recruitment" description={`${openVacancies.length} open vacancies · ${Object.values(candidates.stages).reduce((a, b) => a + (b ?? 0), 0)} candidates`} actions={<NewCandidate vacancies={openVacancies} />} />
-      <nav className="mb-6 inline-flex gap-1 rounded-xl bg-slate-200/60 p-1">
+      <nav className="mb-6 inline-flex gap-1 rounded-full bg-slate-100 p-1">
         {(["candidates", "vacancies"] as const).map((t) => (
-          <Link key={t} href={`/recruitment?tab=${t}`} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium capitalize", tab === t ? "bg-white text-ink shadow-card" : "text-slate-600 hover:text-ink")}>
+          <Link key={t} href={`/recruitment?tab=${t}`} className={cn("rounded-full px-3.5 py-1.5 text-sm font-medium capitalize", tab === t ? "bg-white text-ink shadow-card" : "text-slate-600 hover:text-ink")}>
             {t}
           </Link>
         ))}
@@ -78,7 +78,7 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
           deleteConfirm="Delete this vacancy? Candidates stay but lose the link."
         />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2">
             <div className="flex flex-wrap gap-2">
               <Link href={`/recruitment${toSearchParams({ vacancyId: sp.vacancyId, q: sp.q })}`} className={cn("rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset", !stage ? "bg-ink text-white ring-ink" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50")}>

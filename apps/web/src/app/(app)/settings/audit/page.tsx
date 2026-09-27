@@ -70,7 +70,7 @@ export default async function AuditLogPage({ searchParams }: { searchParams: Pro
                 return (
                   <li key={r.id}>
                     <details className="group">
-                      <summary className={`grid cursor-pointer list-none gap-1 px-4 py-3 text-slate-700 transition-colors hover:bg-brand-50/40 sm:gap-3 ${cols}`}>
+                      <summary className={`grid cursor-pointer list-none gap-1 px-4 py-3 text-slate-700 transition-colors hover:bg-canvas sm:gap-3 ${cols}`}>
                         <span className="text-slate-500 tabular-nums">{fmtDateTime(r.createdAt)}</span>
                         <span className="truncate" title={r.actor?.email}>
                           {actor}
