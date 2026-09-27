@@ -41,7 +41,7 @@ export default async function IntegrationsPage() {
       <p className="text-sm text-ink-muted">Integrations are switched on with server environment variables. Set them in your hosting provider, then redeploy.</p>
       <div className="grid gap-6 md:grid-cols-2">
         <Integration title="Google sign-in" on={!!providerConfig("google")}>
-          <p>Lets people with an existing HRIS account sign in with the Google account that has the same email.</p>
+          <p>Lets people with an existing Ugnayo account sign in with the Google account that has the same email.</p>
           <Env names={["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]} />
           <p className="text-xs">
             Authorized redirect URI: <span className="break-all font-mono text-ink">{appUrl("/api/auth/google/callback")}</span>
@@ -79,7 +79,7 @@ export default async function IntegrationsPage() {
         </Integration>
       </div>
       <p className="text-xs text-slate-500">
-        Google and Microsoft sign-in never create accounts. They link to an active HRIS user with the same email
+        Google and Microsoft sign-in never create accounts. They link to an active Ugnayo user with the same email
         {domains ? `, limited to ${domains} by ` : ", from any domain. Limit it with "}
         <code className="font-mono">SSO_ALLOWED_DOMAINS</code>.
       </p>

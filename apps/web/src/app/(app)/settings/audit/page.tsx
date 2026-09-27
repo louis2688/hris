@@ -52,7 +52,7 @@ export default async function AuditLogPage({ searchParams }: { searchParams: Pro
       </Card>
 
       <Card>
-        <CardHeader title="Audit log" description="Every change made in HRIS, newest first. Expand a row to see what changed." />
+        <CardHeader title="Audit log" description="Every change made in Ugnayo, newest first. Expand a row to see what changed." />
         {data.items.length === 0 ? (
           <EmptyState title="No entries" description="Nothing matches these filters." />
         ) : (

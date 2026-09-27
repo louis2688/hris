@@ -69,7 +69,7 @@ export default async function CaseLetterPage({ params }: { params: Promise<{ id:
               <p className="whitespace-pre-wrap border-l-2 border-hairline pl-4">{c.nteText}</p>
               <p>
                 You are directed to submit a written explanation on or before <strong>{c.nteDueAt ? longTime.format(c.nteDueAt) : ""}</strong>, a period of not less than {NTE_MIN_DAYS} calendar days from receipt of this notice,
-                stating why no disciplinary action should be taken against you. You may submit it through the HRIS (My Info, Cases) or in writing to HR.
+                stating why no disciplinary action should be taken against you. You may submit it through Ugnayo (My Info, Cases) or in writing to HR.
               </p>
               <p>You may request a hearing or conference, where you may be assisted by a representative or counsel of your choice. If you do not submit an explanation by the deadline, the company will decide on the basis of the evidence on hand.</p>
             </>

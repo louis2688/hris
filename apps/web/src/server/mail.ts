@@ -9,7 +9,7 @@ export async function sendMail(m: { to: string; subject: string; text?: string; 
   if (!url) return false;
   try {
     transport ??= nodemailer.createTransport(url);
-    await transport.sendMail({ from: process.env.MAIL_FROM || "HRIS <no-reply@hris.local>", ...m });
+    await transport.sendMail({ from: process.env.MAIL_FROM || "Ugnayo <no-reply@hris.local>", ...m });
     return true;
   } catch (e) {
     console.error("sendMail failed", e);
@@ -32,10 +32,10 @@ export function renderEmail(title: string, body?: string, link?: string) {
   const href = link ? appUrl(link.startsWith("/") ? link : `/${link}`) : null;
   const html = `<div style="background:#f4f4f5;padding:24px;font-family:Arial,sans-serif">
 <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;padding:24px;color:#18181b">
-<div style="font-weight:bold;color:#2563eb;margin-bottom:16px">HRIS</div>
+<div style="font-weight:bold;color:#2563eb;margin-bottom:16px">Ugnayo</div>
 <h2 style="margin:0 0 12px;font-size:18px">${esc(title)}</h2>
 ${body ? `<p style="margin:0 0 20px;line-height:1.5;white-space:pre-line">${esc(body)}</p>` : ""}
-${href ? `<a href="${esc(href)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px">Open in HRIS</a>` : ""}
+${href ? `<a href="${esc(href)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px">Open in Ugnayo</a>` : ""}
 </div></div>`;
   const text = [title, body, href].filter(Boolean).join("\n\n");
   return { html, text };

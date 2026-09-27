@@ -167,7 +167,7 @@ export function AppShell({ user, bell, children }: { user: SessionUser; bell: Re
               <span className="flex size-7 items-center justify-center rounded-lg bg-brand-600 text-white">
                 <Building2 className="size-3.5" />
               </span>
-              <span className="font-display text-lg font-bold tracking-[-0.02em]">HRIS</span>
+              <span className="font-display text-lg font-bold tracking-[-0.02em]">Ugnayo</span>
             </div>
             <div className="ml-auto flex items-center gap-2">
               <ThemeToggle />
@@ -209,7 +209,7 @@ function Brand() {
       <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">
         <Building2 className="size-4" />
       </span>
-      <span className="font-display text-xl font-bold tracking-[-0.02em] text-ink">HRIS</span>
+      <span className="font-display text-xl font-bold tracking-[-0.02em] text-ink">Ugnayo</span>
     </Link>
   );
 }

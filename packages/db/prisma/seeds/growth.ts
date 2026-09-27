@@ -28,7 +28,7 @@ export async function seedGrowth(prisma: PrismaClient) {
     (await prisma.goal.create({
       data: { employeeId, title, cycleId: cycle?.id, kra: d.kra, weight: d.weight, progress: d.progress, status: d.status, dueDate: day(d.due), parentId: d.parentId, description: d.description },
     }));
-  const teamGoal = await goal(mgr.id, "Ship the HRIS mobile app to all employees", { kra: "Delivery", weight: 60, progress: 45, status: "ON_TRACK", due: 60 });
+  const teamGoal = await goal(mgr.id, "Ship the Ugnayo mobile app to all employees", { kra: "Delivery", weight: 60, progress: 45, status: "ON_TRACK", due: 60 });
   await goal(mgr.id, "Grow two engineers into tech leads", { kra: "People", weight: 40, progress: 30, status: "AT_RISK", due: 90 });
   await goal(emp.id, "Build offline punch sync for the mobile app", { kra: "Delivery", weight: 50, progress: 60, status: "ON_TRACK", due: 45, parentId: teamGoal.id, description: "Queue punches locally and sync when back online." });
   await goal(emp.id, "Raise API test coverage to 80%", { kra: "Quality", weight: 30, progress: 80, status: "ON_TRACK", due: 30 });

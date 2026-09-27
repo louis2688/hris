@@ -24,7 +24,7 @@ export function mailInfo() {
     configured: !!raw,
     host,
     // ponytail: mirrors the fallback in mail.ts sendMail(); keep in sync if that changes
-    from: process.env.MAIL_FROM || "HRIS <no-reply@hris.local>",
+    from: process.env.MAIL_FROM || "Ugnayo <no-reply@hris.local>",
     fromIsDefault: !process.env.MAIL_FROM,
     appUrl: appUrl(),
     appUrlSource,

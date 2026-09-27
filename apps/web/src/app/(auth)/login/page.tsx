@@ -9,7 +9,7 @@ import { LoginForm } from "./login-form";
 export const metadata: Metadata = { title: "Sign in" };
 
 const SSO_ERRORS: Record<string, string> = {
-  sso_no_account: "There's no active HRIS account for that email. Ask HR to set one up, then try again.",
+  sso_no_account: "There's no active Ugnayo account for that email. Ask HR to set one up, then try again.",
   sso_domain: "That email domain isn't allowed to sign in here.",
   sso_unverified: "Your provider didn't confirm a verified email address for this account.",
   sso_state: "Your sign-in session expired. Please try again.",

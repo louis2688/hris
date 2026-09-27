@@ -68,7 +68,7 @@ async function main() {
   // ---- Shifts & projects ----
   await prisma.workShift.upsert({ where: { name: "Regular 9-6" }, update: {}, create: { name: "Regular 9-6", startTime: "09:00", endTime: "18:00", breakMinutes: 60, graceMinutes: 10, isDefault: true } });
   await prisma.workShift.upsert({ where: { name: "Night 10pm-7am" }, update: {}, create: { name: "Night 10pm-7am", startTime: "22:00", endTime: "07:00", breakMinutes: 60, graceMinutes: 10 } });
-  for (const [name, client] of [["Internal", null], ["HRIS Platform", "Internal"], ["Client Portal", "Acme Corp"]] as const) {
+  for (const [name, client] of [["Internal", null], ["Ugnayo Platform", "Internal"], ["Client Portal", "Acme Corp"]] as const) {
     await prisma.project.upsert({ where: { name }, update: {}, create: { name, client } });
   }
 

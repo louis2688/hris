@@ -5,10 +5,10 @@ import { THEME_COOKIE, THEME_INIT_SCRIPT } from "@/components/theme-toggle";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "HRIS", template: "%s · HRIS" },
+  title: { default: "Ugnayo", template: "%s · Ugnayo" },
   description: "Human resources management",
-  applicationName: "HRIS",
-  appleWebApp: { capable: true, title: "HRIS", statusBarStyle: "default" },
+  applicationName: "Ugnayo",
+  appleWebApp: { capable: true, title: "Ugnayo", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

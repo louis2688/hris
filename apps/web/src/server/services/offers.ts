@@ -81,7 +81,7 @@ export async function sendOffer(actor: SessionUser, id: string) {
     `Hi ${o.candidate.firstName},\n\nWe're happy to offer you the position of ${role}. Review the full offer and accept or decline online.${o.expiresAt ? `\n\nPlease respond by ${o.expiresAt.toISOString().slice(0, 10)}.` : ""}`,
     `/offer/${token}`,
   );
-  const emailed = await sendMail({ to: o.candidate.email, subject: `Job offer: ${role} at ${company.name}`, html: html.replace("Open in HRIS", "View your offer"), text });
+  const emailed = await sendMail({ to: o.candidate.email, subject: `Job offer: ${role} at ${company.name}`, html: html.replace("Open in Ugnayo", "View your offer"), text });
   await audit(actor.id, "candidate.offer_sent", "Candidate", o.candidateId, { after: { offerId: id, emailed } });
   return { link, emailed };
 }

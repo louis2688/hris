@@ -63,7 +63,7 @@ export function Passkeys({ keys }: { keys: Key[] }) {
               <Fingerprint className="size-5" />
             </div>
             <p className="text-sm text-slate-600">
-              Your fingerprint or face never leaves your device. The phone checks it and sends HRIS a signed yes. Nothing biometric is stored on our servers.
+              Your fingerprint or face never leaves your device. The phone checks it and sends Ugnayo a signed yes. Nothing biometric is stored on our servers.
             </p>
           </div>
           {support === "no" ? (

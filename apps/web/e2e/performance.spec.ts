@@ -34,7 +34,7 @@ test("HR opens a cycle, employee self-reviews, manager completes", async ({ brow
   await emp.getByRole("link").filter({ hasText: cycle }).click();
   await emp.waitForURL(/\/performance\/[^/]+$/);
   await rateAllMax(emp);
-  await emp.getByLabel("Overall self assessment").fill("Shipped the HRIS on time.");
+  await emp.getByLabel("Overall self assessment").fill("Shipped Ugnayo on time.");
   await emp.getByRole("button", { name: "Submit self review" }).click();
   await expect(emp.getByText(/^Submitted /)).toBeVisible();
 

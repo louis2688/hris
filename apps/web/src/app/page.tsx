@@ -32,7 +32,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "HRIS - HR, payroll and time for Philippine teams",
+  title: "Ugnayo - HR, payroll and time for Philippine teams",
   description: "One place for employee records, attendance, leave, payroll, hiring and performance. Built for Philippine labor rules.",
 };
 
@@ -115,11 +115,11 @@ export default function Landing() {
 
       <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="HRIS home">
+          <Link href="/" className="flex items-center gap-2.5" aria-label="Ugnayo home">
             <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">
               <Building2 className="size-4" />
             </span>
-            <span className="font-display text-xl font-bold tracking-[-0.02em]">HRIS</span>
+            <span className="font-display text-xl font-bold tracking-[-0.02em]">Ugnayo</span>
           </Link>
           <nav className="hidden flex-1 items-center gap-1 md:flex" aria-label="Sections">
             {NAV.map(([label, href]) => (
@@ -330,7 +330,7 @@ export default function Landing() {
             <span className="flex size-7 items-center justify-center rounded-lg bg-brand-600 text-white">
               <Building2 className="size-3.5" />
             </span>
-            <span className="font-display font-bold text-ink">HRIS</span>
+            <span className="font-display font-bold text-ink">Ugnayo</span>
             <span>© {new Date().getFullYear()}</span>
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-2" aria-label="Footer">

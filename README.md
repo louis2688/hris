@@ -1,4 +1,4 @@
-# HRIS
+# Ugnayo
 
 Human resources management system: employee records (PIM with skills, licenses, memberships), leave with multi-level approvals, time and attendance (DTR, fingerprint / Face ID passkeys, selfie on punch, ZKTeco terminals), timesheets, recruitment, performance reviews, reports with CSV / PDF export, email notifications and an employee self-service portal. Web app now, React Native (Expo) mobile app next, sharing the same API and contracts.
 

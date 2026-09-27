@@ -94,7 +94,7 @@ test.describe("Google sign-in against a mock provider", () => {
     await page.goto("/login");
     await page.getByRole("link", { name: "Continue with Google" }).click();
     await expect(page).toHaveURL(/\/login\?error=sso_no_account/);
-    await expect(page.getByText("There's no active HRIS account for that email")).toBeVisible();
+    await expect(page.getByText("There's no active Ugnayo account for that email")).toBeVisible();
   });
 });
 
@@ -112,7 +112,7 @@ test("devices API registers and removes an Expo push token for the bearer user",
 test("push opt-out toggle persists on the security page", async ({ page }) => {
   await login(page, USERS.manager);
   await page.goto("/me/security");
-  const push = page.getByLabel("Send push notifications to my phone (HRIS mobile app)");
+  const push = page.getByLabel("Send push notifications to my phone (Ugnayo mobile app)");
   await expect(push).toBeChecked();
   await push.uncheck();
   await page.getByRole("button", { name: "Save preferences" }).click();

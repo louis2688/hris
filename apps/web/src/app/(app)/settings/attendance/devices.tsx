@@ -23,7 +23,7 @@ export function Devices({ devices, locations, host }: { devices: Device[]; locat
     <Card>
       <CardHeader
         title="Biometric terminals"
-        description="Fingerprint and face scanners that push punches to HRIS"
+        description="Fingerprint and face scanners that push punches to Ugnayo"
         action={
           <Button size="sm" onClick={() => setEditing("new")}>
             <Plus /> Add terminal
