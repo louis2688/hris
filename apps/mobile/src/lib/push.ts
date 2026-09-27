@@ -44,12 +44,15 @@ export async function unregisterPush() {
   }
 }
 
-/** Web links sent by notify() -> app screens. Unknown links open Home. /leave/<id> goes to Approvals only for approvers. */
+/** Web links sent by notify() -> app screens. Unknown links open Home. /leave/<id> and /requests/... go to Approvals for approvers. */
 export function screenFor(link: unknown, approver: boolean): Href {
   const l = typeof link === "string" ? link : "";
   if (l.startsWith("/me/leave")) return "/leave";
   if (l.startsWith("/leave/")) return approver ? "/approvals" : "/leave";
   if (l.startsWith("/attendance")) return "/attendance";
+  if (l.startsWith("/requests/")) return approver ? "/approvals" : "/requests";
+  // /payslips/<id>, /surveys/<id>, /announcements, /schedule map 1:1 onto app routes.
+  if (/^\/(payslips|surveys)\/[\w-]+$/.test(l) || l === "/announcements" || l === "/schedule") return l as Href;
   return "/";
 }
 

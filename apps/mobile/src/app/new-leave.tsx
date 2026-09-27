@@ -1,24 +1,12 @@
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { countLeaveDays, createLeaveRequestSchema, DAY_PART_LABELS, DAY_PARTS, type DayPart, type LeaveBalance } from "@hris/shared";
 import { api, errorMessage, useApi } from "@/lib/api";
-import { Banner, Button, C, Input, s, todayIso } from "@/lib/ui";
+import { Banner, Button, C, Chip, Input, s, todayIso } from "@/lib/ui";
 
 type LeaveType = { id: string; name: string; color: string; allowHalfDay: boolean; isPaid: boolean };
 const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
-
-function Chip({ label, active, onPress, dot }: { label: string; active: boolean; onPress: () => void; dot?: string }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{ flexDirection: "row", alignItems: "center", gap: 6, minHeight: 40, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: active ? C.dark : C.border, backgroundColor: active ? C.dark : C.card }}
-    >
-      {dot ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dot }} /> : null}
-      <Text style={{ color: active ? C.onDark : C.ink, fontWeight: "600" }}>{label}</Text>
-    </Pressable>
-  );
-}
 
 function Parts({ label, value, onChange }: { label: string; value: DayPart; onChange: (v: DayPart) => void }) {
   return (

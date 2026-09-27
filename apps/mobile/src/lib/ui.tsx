@@ -128,13 +128,48 @@ export function Pill({ label, color, bg, border }: { label: string; color: strin
   );
 }
 
-const STATUS: Record<LeaveStatus, [string, string, string?]> = {
+const NEUTRAL: [string, string, string?] = [C.mute, C.canvas, C.border];
+const STATUS: Record<string, [string, string, string?]> = {
   PENDING: [C.amber, C.amberSoft],
   APPROVED: [C.onDark, C.green],
+  ACTIVE: [C.onDark, C.green],
+  PAID: [C.ink, C.bone],
   REJECTED: [C.red, C.redSoft],
-  CANCELLED: [C.mute, C.canvas, C.border],
 };
-export const StatusPill = ({ status }: { status: LeaveStatus }) => <Pill label={status.charAt(0) + status.slice(1).toLowerCase()} color={STATUS[status][0]} bg={STATUS[status][1]} border={STATUS[status][2]} />;
+/** Leave, request, loan and correction statuses. Unknown ones (CANCELLED, FINALIZED...) render neutral. */
+export function StatusPill({ status }: { status: LeaveStatus | (string & {}) }) {
+  const [fg, bg, border] = STATUS[status] ?? NEUTRAL;
+  return <Pill label={status.charAt(0) + status.slice(1).toLowerCase()} color={fg} bg={bg} border={border} />;
+}
+
+/** Selectable pill (filters, form choices). Ink when active. */
+export function Chip({ label, active, onPress, dot }: { label: string; active: boolean; onPress: () => void; dot?: string }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={{ flexDirection: "row", alignItems: "center", gap: 6, minHeight: 40, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: active ? C.dark : C.border, backgroundColor: active ? C.dark : C.card }}
+    >
+      {dot ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dot }} /> : null}
+      <Text style={{ color: active ? C.onDark : C.ink, fontWeight: "600" }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** Tappable row with a trailing chevron (More menu, lists that open a detail screen). */
+export function Row({ title, detail, right, onPress, first }: { title: string; detail?: string; right?: ReactNode; onPress: () => void; first?: boolean }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [s.between, { paddingVertical: 12, borderTopWidth: first ? 0 : 1, borderColor: C.border, opacity: pressed ? 0.6 : 1 }]}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[s.body, { fontWeight: "600" }]}>{title}</Text>
+        {detail ? <Text style={s.muted}>{detail}</Text> : null}
+      </View>
+      {right}
+      <Text style={{ fontSize: 20, color: C.stone }}>›</Text>
+    </Pressable>
+  );
+}
 
 export function Banner({ text, tone = "error" }: { text?: string | null; tone?: "error" | "ok" }) {
   if (!text) return null;
@@ -182,6 +217,9 @@ export function fmtDay(iso: string) {
 }
 export const fmtRange = (a: string, b: string) => (a.slice(0, 10) === b.slice(0, 10) ? fmtDay(a) : `${fmtDay(a)} - ${fmtDay(b)}`);
 export const fmtTime = (iso: string | Date, timeZone?: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone });
+const PHP = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+/** 12345.5 or "12345.50" -> "₱12,345.50" */
+export const peso = (n: number | string) => PHP.format(Number(n));
 export const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 export const todayIso = () => {
   const d = new Date();

@@ -5,9 +5,10 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as Location from "expo-location";
-import { fmtMinutes, PUNCH_METHOD_LABELS, type DtrStatus } from "@hris/shared";
-import { api, ApiError, errorMessage, useApi, type Dtr, type Punch, type Today } from "@/lib/api";
-import { Banner, Button, C, Card, Empty, fmtDay, fmtTime, mono, monthLabel, Pill, s, Screen, todayIso } from "@/lib/ui";
+import { router } from "expo-router";
+import { addDaysIso, CORRECTION_KIND_LABELS, CORRECTION_MAX_DAYS_BACK, fmtMinutes, PUNCH_METHOD_LABELS, type DtrStatus } from "@hris/shared";
+import { api, ApiError, errorMessage, useApi, type Correction, type Dtr, type Punch, type Today } from "@/lib/api";
+import { Banner, Button, C, Card, Chip, Empty, fmtDay, fmtTime, mono, monthLabel, Pill, s, Screen, StatusPill, todayIso } from "@/lib/ui";
 
 type PunchBody = { photo?: string; latitude?: number; longitude?: number };
 
@@ -47,6 +48,7 @@ export default function Attendance() {
   const [month, setMonth] = useState(thisMonth);
   const today = useApi<Today>("/attendance/today");
   const dtr = useApi<Dtr>(`/attendance/dtr?month=${month}`);
+  const cor = useApi<{ mine: Correction[] }>("/attendance/corrections");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; tone: "ok" | "error" } | null>(null);
   const [now, setNow] = useState(new Date());
@@ -95,15 +97,21 @@ export default function Attendance() {
   }
 
   const rows = dtr.data?.rows.filter((d) => d.status !== "UPCOMING") ?? [];
+  // Same rule as the web DTR: INCOMPLETE/ABSENT days from yesterday back CORRECTION_MAX_DAYS_BACK get a Fix action.
+  const fixTo = addDaysIso(todayIso(), -1);
+  const fixFrom = addDaysIso(todayIso(), -CORRECTION_MAX_DAYS_BACK);
+  const pendingFix = new Set(cor.data?.mine.filter((c) => c.status === "PENDING").map((c) => c.date.slice(0, 10)));
+  const fix = (date: string, kind = "MISSED_BOTH") => router.push({ pathname: "/correction", params: { date, kind } });
   const t = dtr.data?.totals;
 
   return (
     <Screen
       title="Attendance"
-      loading={today.loading || dtr.loading}
+      loading={today.loading || dtr.loading || cor.loading}
       onRefresh={() => {
         void today.reload();
         void dtr.reload();
+        void cor.reload();
       }}
     >
       <Card style={{ padding: 0, overflow: "hidden" }}>
@@ -175,7 +183,16 @@ export default function Attendance() {
                 <View key={d.date} style={[s.between, { paddingVertical: 8, borderTopWidth: 1, borderColor: C.border }]}>
                   <View style={{ gap: 4, flex: 1 }}>
                     <Text style={[s.body, { fontWeight: "600" }]}>{fmtDay(d.date)}</Text>
-                    <Pill label={d.leave ? `${label} · ${d.leave.code}` : d.holiday ? `${label} · ${d.holiday}` : label} color={fg} bg={bg} border={border} />
+                    <View style={s.row}>
+                      <Pill label={d.leave ? `${label} · ${d.leave.code}` : d.holiday ? `${label} · ${d.holiday}` : label} color={fg} bg={bg} border={border} />
+                      {(d.status === "INCOMPLETE" || d.status === "ABSENT") && d.date >= fixFrom && d.date <= fixTo ? (
+                        pendingFix.has(d.date) ? (
+                          <Text style={[s.small, { color: C.amber }]}>Fix pending</Text>
+                        ) : (
+                          <Chip label="Fix" active={false} onPress={() => fix(d.date, d.status === "INCOMPLETE" ? "MISSED_OUT" : "MISSED_BOTH")} />
+                        )
+                      ) : null}
+                    </View>
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 2 }}>
                     <Text style={[s.body, s.mono]}>{d.timeIn || d.timeOut ? `${d.timeIn ?? "--:--"} - ${d.timeOut ?? "--:--"}` : "-"}</Text>
@@ -190,6 +207,32 @@ export default function Attendance() {
             })
         ) : (
           <Empty text="Nothing recorded this month" loading={dtr.loading && !dtr.data} />
+        )}
+      </Card>
+
+      <Card>
+        <View style={s.between}>
+          <Text style={s.h2}>My corrections</Text>
+          <Chip label="New" active={false} onPress={() => fix(fixTo)} />
+        </View>
+        <Banner text={cor.error} />
+        {cor.data?.mine.length ? (
+          cor.data.mine.slice(0, 10).map((c) => (
+            <View key={c.id} style={{ gap: 4, paddingVertical: 8, borderTopWidth: 1, borderColor: C.border }}>
+              <View style={s.between}>
+                <Text style={[s.body, { fontWeight: "600", flex: 1 }]}>
+                  {fmtDay(c.date)} · {CORRECTION_KIND_LABELS[c.kind]}
+                </Text>
+                <StatusPill status={c.status} />
+              </View>
+              <Text style={s.small}>
+                {[c.inTime && `In ${c.inTime}`, c.outTime && `Out ${c.outTime}`, c.reason].filter(Boolean).join(" · ")}
+              </Text>
+              {c.decisionNote ? <Text style={s.small}>Note: {c.decisionNote}</Text> : null}
+            </View>
+          ))
+        ) : (
+          <Empty text="No corrections filed" loading={cor.loading && !cor.data} />
         )}
       </Card>
     </Screen>

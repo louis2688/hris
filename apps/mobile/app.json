@@ -1,24 +1,43 @@
 {
   "expo": {
     "name": "HRIS",
-    "slug": "hris-mobile",
+    "slug": "hris",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "hris",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f9f7f3"
+    },
     "ios": {
-      "bundleIdentifier": "com.hris.mobile",
-      "supportsTablet": false
+      "bundleIdentifier": "com.hris.app",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "config": { "usesNonExemptEncryption": false },
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take a selfie when your company requires one to clock in or out, or photograph a receipt for an expense claim.",
+        "NSLocationWhenInUseUsageDescription": "Record where you clock in or out when your company requires it.",
+        "NSFaceIDUsageDescription": "Confirm it's you before clocking in or out."
+      }
     },
     "android": {
-      "package": "com.hris.mobile"
+      "package": "com.hris.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ea2804"
+      },
+      "permissions": ["CAMERA", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "USE_BIOMETRIC", "USE_FINGERPRINT", "POST_NOTIFICATIONS"]
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-notifications",
+      ["expo-notifications", { "color": "#ea2804" }],
       ["expo-local-authentication", { "faceIDPermission": "Confirm it's you before clocking in or out." }],
-      ["expo-image-picker", { "cameraPermission": "Take a selfie when your company requires one to clock in or out.", "photosPermission": false, "microphonePermission": false }],
+      ["expo-image-picker", { "cameraPermission": "Take a selfie when your company requires one to clock in or out, or photograph a receipt for an expense claim.", "photosPermission": false, "microphonePermission": false }],
       ["expo-location", { "locationWhenInUsePermission": "Record where you clock in or out when your company requires it." }]
     ]
   }
