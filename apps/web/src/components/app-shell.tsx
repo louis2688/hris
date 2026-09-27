@@ -205,7 +205,7 @@ export function AppShell({ user, bell, children }: { user: SessionUser; bell: Re
 
 function Brand() {
   return (
-    <Link href="/dashboard" prefetch={false} className="flex h-16 items-center gap-2.5 px-5">
+    <Link href="/" prefetch={false} className="flex h-16 items-center gap-2.5 px-5">
       <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">
         <Building2 className="size-4" />
       </span>

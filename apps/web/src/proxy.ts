@@ -40,7 +40,7 @@ export async function proxy(req: NextRequest) {
   headers.set("content-security-policy", policy);
   const pass = () => secure(NextResponse.next({ request: { headers } }), policy);
 
-  if (PUBLIC.some((p) => pathname === p || pathname.startsWith(p + "/"))) return pass();
+  if (pathname === "/" || PUBLIC.some((p) => pathname === p || pathname.startsWith(p + "/"))) return pass(); // "/" = landing page, exact match only
 
   // API routes authenticate themselves (bearer or cookie) and return JSON 401s.
   if (pathname.startsWith("/api/")) return pass();
