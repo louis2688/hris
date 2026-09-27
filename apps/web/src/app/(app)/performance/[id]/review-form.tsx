@@ -26,7 +26,7 @@ export function ReviewForm({ id, side, items, comment }: { id: string; side: "se
           {/* float + w-full keeps the legend inside the padded box */}
           <legend className="float-left w-full text-sm font-semibold text-ink">{it.kpiName}</legend>
           {it.description ? <p className="clear-left pt-0.5 text-xs text-slate-500">{it.description}</p> : null}
-          {it.hint ? <p className="clear-left pt-1 text-xs text-violet-700">{it.hint}</p> : null}
+          {it.hint ? <p className="clear-left pt-1 text-xs text-tone-violet-fg">{it.hint}</p> : null}
           <div className="clear-left flex flex-wrap gap-1.5 pt-3">
             {Array.from({ length: it.maxRating - it.minRating + 1 }, (_, i) => it.minRating + i).map((n) => (
               <label key={n} className="cursor-pointer">

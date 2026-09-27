@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma, type Prisma } from "@hris/db";
-import { computeFinalRating, FINAL_RATING_SCALE, type KpiInput, type ReviewCycleInput, type ReviewFormInput, type SessionUser } from "@hris/shared";
+import { computeFinalRating, FINAL_RATING_SCALE, MAX_PEERS, type KpiInput, type PeerFeedbackInput, type ReviewCycleInput, type ReviewFormInput, type SessionUser } from "@hris/shared";
 import { AuthError } from "../auth/session";
 import { isStaff } from "../authz";
 import { audit, notify } from "./audit";
@@ -209,4 +209,63 @@ export async function saveManagerReview(u: SessionUser, id: string, d: ReviewFor
   });
   await audit(u.id, submit ? "review.complete" : "review.manager_save", "PerformanceReview", id, submit ? { after: { finalRating } } : {});
   if (submit) await notify(r.employee.userId, `Review completed: ${r.cycle.name}`, finalRating != null ? `Final rating ${finalRating.toFixed(2)} / ${FINAL_RATING_SCALE}` : undefined, `/performance/${id}`);
+}
+
+// ---------- Peer / 360 feedback ----------
+
+/** Reviewer (or HR/Admin) asks up to MAX_PEERS colleagues for feedback while the review is open. Never the reviewee. */
+export async function requestPeerFeedback(u: SessionUser, reviewId: string, reviewerIds: string[]) {
+  const r = await getReview(u, reviewId);
+  if (!(isReviewerOf(u, r) || (isStaff(u) && r.employeeId !== u.employeeId))) throw new AuthError("Only the reviewer or HR can request peer feedback", 403);
+  assertOpen(r);
+  if (r.status === "COMPLETED") throw new AppError("This review is already completed");
+  const ids = [...new Set(reviewerIds)];
+  if (ids.includes(r.employeeId)) throw new AppError("An employee cannot give peer feedback on their own review");
+  const existing = await prisma.peerFeedback.findMany({ where: { reviewId }, select: { reviewerId: true } });
+  const fresh = ids.filter((id) => !existing.some((e) => e.reviewerId === id));
+  if (existing.length + fresh.length > MAX_PEERS) throw new AppError(`Up to ${MAX_PEERS} peers per review (${existing.length} already asked)`);
+  const peers = await prisma.employee.findMany({ where: { id: { in: fresh }, deletedAt: null, employmentStatus: { notIn: ["RESIGNED", "TERMINATED"] } }, select: { id: true, userId: true } });
+  if (peers.length !== fresh.length) throw new AppError("Pick active employees only");
+  await prisma.peerFeedback.createMany({ data: peers.map((p) => ({ reviewId, reviewerId: p.id })), skipDuplicates: true });
+  await audit(u.id, "review.peer_request", "PerformanceReview", reviewId, { after: { reviewerIds: fresh } });
+  await Promise.all(peers.map((p) => notify(p.userId, "Peer feedback requested", `Share feedback on ${r.employee.firstName} ${r.employee.lastName} for ${r.cycle.name}.`, "/performance")));
+  return { added: peers.length };
+}
+
+/** Open requests addressed to this employee. */
+export const peerRequestsFor = (employeeId: string) =>
+  prisma.peerFeedback.findMany({
+    where: { reviewerId: employeeId, submittedAt: null, review: { cycle: { status: "ACTIVE" } } },
+    include: { review: { select: { employee: person, cycle: { select: { name: true, dueDate: true } } } } },
+    orderBy: { createdAt: "asc" },
+  });
+
+export async function submitPeerFeedback(u: SessionUser, id: string, d: PeerFeedbackInput) {
+  const { count } = await prisma.peerFeedback.updateMany({
+    where: { id, reviewerId: u.employeeId ?? "-", submittedAt: null, review: { cycle: { status: "ACTIVE" } } },
+    data: { rating: d.rating, strengths: d.strengths ?? null, improvements: d.improvements ?? null, submittedAt: new Date() },
+  });
+  if (!count) throw new AppError("This request is closed or was already answered");
+  await audit(u.id, "review.peer_submit", "PeerFeedback", id);
+}
+
+/**
+ * What `u` may see of a review's peer feedback. Reviewer/HR: everything with names (incl. pending).
+ * The employee: submitted feedback only once COMPLETED, with no names, in random order.
+ */
+export async function peerFeedbackView(u: SessionUser, r: ReviewDetail) {
+  const named = isStaff(u) || isReviewerOf(u, r);
+  if (!named && !(r.employeeId === u.employeeId && r.status === "COMPLETED")) return null;
+  const rows = await prisma.peerFeedback.findMany({
+    where: { reviewId: r.id, ...(named ? {} : { submittedAt: { not: null } }) },
+    include: { reviewer: person },
+    orderBy: { createdAt: "asc" },
+  });
+  if (named) return { named: true as const, rows };
+  const anon = rows.map((x) => ({ rating: x.rating, strengths: x.strengths, improvements: x.improvements }));
+  for (let i = anon.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [anon[i], anon[j]] = [anon[j]!, anon[i]!];
+  }
+  return { named: false as const, rows: anon };
 }

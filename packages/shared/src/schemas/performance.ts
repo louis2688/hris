@@ -49,3 +49,17 @@ export function computeFinalRating(items: { rating: number | null | undefined; m
   const avg = rated.reduce((s, i) => s + 1 + ((i.rating - i.minRating) / (i.maxRating - i.minRating)) * (FINAL_RATING_SCALE - 1), 0) / rated.length;
   return Math.round(avg * 100) / 100;
 }
+
+// ---------- peer / 360 feedback ----------
+
+/** Max peers per review. */
+export const MAX_PEERS = 5;
+export const peerRequestSchema = z.object({
+  reviewerIds: z.preprocess((v) => (v == null || v === "" ? [] : Array.isArray(v) ? v : [v]), z.array(z.string().min(1)).min(1, "Pick at least one peer").max(MAX_PEERS, `Up to ${MAX_PEERS} peers`)),
+});
+export const peerFeedbackSchema = z.object({
+  rating: z.coerce.number().int().min(1, "Pick 1-5").max(5, "Pick 1-5"),
+  strengths: opt(2000),
+  improvements: opt(2000),
+});
+export type PeerFeedbackInput = z.infer<typeof peerFeedbackSchema>;

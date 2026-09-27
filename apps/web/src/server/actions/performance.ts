@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { kpiSchema, reviewCycleSchema, reviewFormSchema } from "@hris/shared";
+import { kpiSchema, peerFeedbackSchema, peerRequestSchema, reviewCycleSchema, reviewFormSchema } from "@hris/shared";
 import { requireRole, requireSession } from "../auth/session";
 import * as perf from "../services/performance";
 import { bools, formToObject, parse, run, type ActionResult } from "./_helpers";
@@ -76,4 +76,22 @@ export async function saveSelfReviewAction(id: string, _p: ActionResult | undefi
 }
 export async function saveManagerReviewAction(id: string, _p: ActionResult | undefined, fd: FormData) {
   return saveReview("manager", id, fd);
+}
+
+export async function requestPeersAction(reviewId: string, _p: ActionResult | undefined, fd: FormData): Promise<ActionResult> {
+  const u = await requireSession();
+  const p = parse(peerRequestSchema, formToObject(fd));
+  if ("error" in p) return p.error;
+  const r = await run(async () => void (await perf.requestPeerFeedback(u, reviewId, p.data.reviewerIds)), "Feedback requested");
+  revalidatePath(`/performance/${reviewId}`);
+  return r;
+}
+
+export async function peerFeedbackAction(id: string, _p: ActionResult | undefined, fd: FormData): Promise<ActionResult> {
+  const u = await requireSession();
+  const p = parse(peerFeedbackSchema, formToObject(fd));
+  if ("error" in p) return p.error;
+  const r = await run(() => perf.submitPeerFeedback(u, id, p.data), "Feedback sent. Thank you!");
+  revalidatePath("/performance");
+  return r;
 }

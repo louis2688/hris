@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FINAL_RATING_SCALE } from "@hris/shared";
+import { FINAL_RATING_SCALE, goalWeightTotal, MAX_PEERS } from "@hris/shared";
 import { requireSession } from "@/server/auth/session";
 import { isStaff } from "@/server/authz";
-import { getReview, isReviewerOf, type ReviewDetail } from "@/server/services/performance";
-import { Card, CardBody, CardHeader, EmptyState, PageHeader } from "@/components/ui/card";
+import { getReview, isReviewerOf, peerFeedbackView, type ReviewDetail } from "@/server/services/performance";
+import { goalsForReview } from "@/server/services/goals";
+import { pickableEmployees } from "@/server/services/training";
+import { Badge, Card, CardBody, CardHeader, EmptyState, PageHeader } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { fmtDate, fmtDateTime, fullName } from "@/lib/utils";
 import { ReviewBadge } from "../review-badge";
 import { ReviewForm } from "./review-form";
+import { GoalBadge, ProgressBar } from "../goal-ui";
+import { PeerRequestForm } from "../peer-ui";
 
 export const metadata: Metadata = { title: "Performance review" };
 
@@ -53,6 +57,11 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
   const showSelf = isSelf || r.status !== "SELF_REVIEW";
   const showManager = r.status === "COMPLETED" || (!isSelf && r.status === "MANAGER_REVIEW" && (isReviewer || isStaff(user)));
   const reviewerName = r.reviewer ? fullName(r.reviewer) : "HR";
+  const canRequest = (isReviewer || (isStaff(user) && !isSelf)) && open && r.status !== "COMPLETED";
+  const [goals, peers, people] = await Promise.all([goalsForReview(r.employeeId, r.cycleId), peerFeedbackView(user, r), canRequest ? pickableEmployees() : []]);
+  const asked = new Set(peers?.named ? peers.rows.map((p) => p.reviewerId) : []);
+  const room = MAX_PEERS - asked.size;
+  const weight = goalWeightTotal(goals);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -135,6 +144,74 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
             )}
           </CardBody>
         </Card>
+
+        <Card>
+          <CardHeader
+            title="Goals this cycle"
+            description={
+              goals.length
+                ? `Weights total ${weight}%${weight === 100 ? "" : " (should be 100%)"}. Goal achievement is not scored separately: the final rating stays KPI-based, so reflect goals in the overall feedback.`
+                : "No goals linked to this cycle."
+            }
+          />
+          {goals.length ? (
+            <ul className="divide-y divide-slate-100">
+              {goals.map((g) => (
+                <li key={g.id} className="px-5 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="min-w-0 flex-1 text-sm font-medium text-ink">{g.title}</p>
+                    <GoalBadge status={g.status} />
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">{[g.kra, `${g.weight}% weight`, g.dueDate ? `due ${fmtDate(g.dueDate)}` : null].filter(Boolean).join(" · ")}</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <ProgressBar value={g.progress} status={g.status} className="flex-1" />
+                    <span className="w-10 text-right text-sm font-semibold tabular-nums text-ink">{g.progress}%</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </Card>
+
+        {peers ? (
+          <Card>
+            <CardHeader
+              title="Peer feedback"
+              description={peers.named ? "Names are visible to the reviewer and HR only. The employee sees answers without names once the review is completed." : "From colleagues, shared without names."}
+            />
+            {peers.rows.length ? (
+              <ul className="divide-y divide-slate-100">
+                {peers.rows.map((p, i) => (
+                  <li key={"id" in p ? String(p.id) : i} className="px-5 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="min-w-0 flex-1 text-sm font-medium text-ink">{"reviewer" in p ? fullName(p.reviewer) : `Peer ${i + 1}`}</p>
+                      {p.rating != null ? (
+                        <span className="text-sm tabular-nums text-slate-500">
+                          <span className="font-bold text-ink">{p.rating}</span> / 5
+                        </span>
+                      ) : (
+                        <Badge tone="amber">Pending</Badge>
+                      )}
+                    </div>
+                    {p.strengths ? <p className="mt-1 whitespace-pre-line text-sm text-slate-700"><span className="font-medium text-tone-green-fg">Strengths: </span>{p.strengths}</p> : null}
+                    {p.improvements ? <p className="mt-1 whitespace-pre-line text-sm text-slate-700"><span className="font-medium text-tone-amber-fg">Could improve: </span>{p.improvements}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState title="No peer feedback yet" description={canRequest ? "Ask a few colleagues who work closely with them." : undefined} />
+            )}
+            {canRequest && room > 0 ? (
+              <CardBody className="border-t border-slate-100">
+                <PeerRequestForm
+                  reviewId={r.id}
+                  max={room}
+                  people={people.filter((p) => p.id !== r.employeeId && !asked.has(p.id)).map((p) => ({ id: p.id, name: fullName(p), dept: p.department?.name }))}
+                />
+              </CardBody>
+            ) : null}
+          </Card>
+        ) : null}
       </div>
     </div>
   );
