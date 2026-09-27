@@ -10,8 +10,8 @@ export function ProfileHero({ e, actions }: { e: EmployeeDetail; actions?: React
   return (
     <Card className="mb-6 overflow-hidden">
       <div className="h-20 bg-gradient-to-r from-brand-500 via-brand-400 to-sky-300" aria-hidden />
-      <CardBody className="-mt-10 flex flex-col gap-4 sm:flex-row sm:items-end">
-        <Avatar first={e.firstName} last={e.lastName} src={e.avatarUrl} size="xl" className="ring-4 ring-white shadow-card" />
+      <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <Avatar first={e.firstName} last={e.lastName} src={e.avatarUrl} size="xl" className="-mt-14 shrink-0 ring-4 ring-white shadow-card" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-bold tracking-tight">{fullName(e)}</h1>
@@ -26,7 +26,7 @@ export function ProfileHero({ e, actions }: { e: EmployeeDetail; actions?: React
             {e.location ? ` · ${e.location.name}` : ""} · Joined {fmtDate(e.hireDate)}
           </p>
         </div>
-        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+        {actions ? <div className="flex flex-wrap gap-2 sm:self-center">{actions}</div> : null}
       </CardBody>
     </Card>
   );
