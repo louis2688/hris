@@ -8,6 +8,7 @@ import { getBalances } from "./leave";
 import { employeeHolidayWhere } from "./org";
 import { getSetting } from "./settings";
 import { AppError } from "./errors";
+import { rateLimit } from "../rate-limit";
 
 /**
  * Employee self-service HR assistant. Every tool is scoped to the signed-in user's own employee record:
@@ -154,15 +155,5 @@ export async function askAssistant(user: SessionUser, req: AssistantRequest, emi
   });
 }
 
-// ponytail: in-memory token bucket per user (10 burst, 1 per 6s). Per-instance only: on serverless each
-// instance has its own bucket and it resets on cold start. Move to Postgres/Redis if abuse matters.
-const buckets = new Map<string, { tokens: number; at: number }>();
-export function takeToken(userId: string, now = Date.now()) {
-  const b = buckets.get(userId) ?? { tokens: 10, at: now };
-  b.tokens = Math.min(10, b.tokens + (now - b.at) / 6000);
-  b.at = now;
-  buckets.set(userId, b);
-  if (b.tokens < 1) return false;
-  b.tokens -= 1;
-  return true;
-}
+/** 10 messages per minute per user (was an in-memory 10-burst bucket refilling 1 per 6s). */
+export const assistantLimit = (userId: string) => rateLimit(`assistant:user:${userId}`, 10, 60);

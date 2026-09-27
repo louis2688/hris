@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { offerAcceptSchema, offerDeclineSchema, offerSchema, termsFromForm } from "@hris/shared";
 import { requireRole } from "../auth/session";
-import { rateLimited } from "../services/careers";
+import { clientIp, rateLimit } from "../rate-limit";
 import * as offers from "../services/offers";
 import { bools, formToObject, parse, run, type ActionResult } from "./_helpers";
 
@@ -39,8 +39,8 @@ export async function withdrawOfferAction(candidateId: string, id: string): Prom
 // ---------- public, token-authenticated ----------
 
 async function limited(token: string) {
-  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  return rateLimited(`offer:${ip}`, 10, 10 * 60_000) || rateLimited(`offer-token:${token}`, 10, 10 * 60_000);
+  const ip = clientIp(await headers());
+  return !(await rateLimit(`offer:${ip}`, 10, 600)).ok || !(await rateLimit(`offer-token:${token}`, 10, 600)).ok;
 }
 const slowDown: ActionResult = { ok: false, error: "Too many attempts. Please wait a few minutes and try again." };
 

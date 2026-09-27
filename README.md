@@ -158,3 +158,62 @@ A provider's button shows on the login page only when both its id and secret are
 - Remote push needs a development or store build. Expo Go (SDK 53+) doesn't receive remote push on Android.
 
 Tests: `node --test apps/web/src/server/auth/oidc.test.mjs` (state cookie, PKCE, id_token checks). `e2e/platform.spec.ts` runs a full Google round trip against a local mock provider when the server has `GOOGLE_CLIENT_ID=e2e GOOGLE_CLIENT_SECRET=e2e GOOGLE_ISSUER=http://localhost:3199 APP_URL=<base url>` and the tests get `E2E_MOCK_OIDC_PORT=3199`.
+
+## Operations
+
+### Environment (Vercel)
+
+| Env | |
+|---|---|
+| `SENTRY_DSN` | Server + edge error reporting. Unset = Sentry never initialises (local, CI, e2e) |
+| `NEXT_PUBLIC_SENTRY_DSN` | Browser error reporting. Usually the same DSN. Needs a redeploy (inlined at build) |
+| `SENTRY_TRACES_SAMPLE_RATE` | Server trace sampling, default `0.1`. `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` does the same for the browser |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Optional. Only for source-map upload during `next build`; without them the build skips upload |
+
+Sentry runs with `sendDefaultPii: false` and strips cookies, headers, query strings, offer-link tokens and any `password` / `token` / `tin` / `sss` / `bankAccountNo` style keys before sending.
+
+### Rate limits
+
+Counters live in the `RateLimit` table (fixed window, one atomic upsert per hit, shared by every serverless instance). If the DB is unreachable the limiter lets requests through and logs `rateLimit failed open`.
+
+| What | Limit |
+|---|---|
+| Login (web + `/api/v1/auth/login`) | 10 failed attempts / 15 min per email, 20 / 15 min per IP. Successful sign-ins don't count |
+| Assistant | 10 messages / min per user |
+| Careers apply | 5 / 10 min per IP |
+| Offer accept/decline | 10 / 10 min per IP and per offer link |
+
+Unlock someone early: `DELETE FROM "RateLimit" WHERE key = 'login:email:someone@acme.com';`
+
+### Uptime (UptimeRobot)
+
+`GET /api/v1/health` (public, `no-store`) returns `{ ok, db, latencyMs, version }`: 200 when `SELECT 1` answers within 3s, 503 otherwise.
+
+UptimeRobot > Add New Monitor > **Keyword**, URL `<APP_URL>/api/v1/health`, interval 5 minutes, keyword `"ok":true` (alert when the keyword does NOT exist). Add your email / Slack as alert contacts.
+
+### Nightly database backups
+
+`.github/workflows/db-backup.yml` runs daily at 18:30 UTC (02:30 Manila): `pg_dump` (custom format, `public` schema), AES256 `gpg` encryption, uploaded as artifact `hris-db-YYYY-MM-DD` kept 30 days. It fails loudly if a secret is missing.
+
+GitHub > Settings > Secrets and variables > Actions:
+
+| Secret | |
+|---|---|
+| `BACKUP_DATABASE_URL` | Supabase **Session pooler** URI, port **5432** (not the transaction pooler on 6543, which breaks `pg_dump`) |
+| `BACKUP_PASSPHRASE` | Long random string (`openssl rand -base64 32`). Store it in your password manager too: without it the backups are unreadable |
+
+Run one now: Actions > DB backup > Run workflow (or `gh workflow run db-backup.yml`).
+
+Restore (needs `gpg` and `postgresql-client-17`):
+
+```bash
+gh run list --workflow db-backup.yml
+gh run download <run-id> -n hris-db-YYYY-MM-DD
+BACKUP_PASSPHRASE='...' scripts/restore-backup.sh hris-db-YYYY-MM-DD.dump.gpg "postgresql://..."
+```
+
+The script asks you to type `RESTORE`, then runs `pg_restore --clean --if-exists --no-owner`, which replaces whatever is in the target. Restore into a scratch database or Supabase branch first and check it before touching production.
+
+### CI
+
+`.github/workflows/ci.yml` on every push to `main`/`develop` and every PR: install, `prisma generate`, typecheck (web + packages), shared unit tests and the web `node --test` suites. No database needed.

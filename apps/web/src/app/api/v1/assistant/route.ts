@@ -2,7 +2,7 @@ import { assistantRequestSchema } from "@hris/shared";
 import { apiError, body, handler } from "@/server/api";
 import { AI_NOT_CONFIGURED, aiProvider } from "@/server/ai";
 import { AppError } from "@/server/services/errors";
-import { askAssistant, takeToken, type AssistantEvent } from "@/server/services/assistant";
+import { askAssistant, assistantLimit, type AssistantEvent } from "@/server/services/assistant";
 
 export const maxDuration = 120;
 
@@ -14,7 +14,7 @@ export const maxDuration = 120;
 export const POST = handler(async ({ req, user }) => {
   if (!aiProvider()) return apiError(503, "AI_NOT_CONFIGURED", AI_NOT_CONFIGURED);
   const input = await body(req, assistantRequestSchema);
-  if (!takeToken(user.id)) return apiError(429, "RATE_LIMITED", "You are sending messages too quickly. Wait a few seconds and try again.");
+  if (!(await assistantLimit(user.id)).ok) return apiError(429, "RATE_LIMITED", "You are sending messages too quickly. Wait a few seconds and try again.");
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(ctrl) {

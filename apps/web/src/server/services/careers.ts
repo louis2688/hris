@@ -7,19 +7,7 @@ import { MAX_DOC_BYTES, sanitizeName, sniff } from "./documents";
 import type { ActionResult } from "../actions/_helpers";
 import { AppError } from "./errors";
 import { manilaToday } from "./onboarding";
-
-// ponytail: in-memory fixed window per process. Resets on deploy and isn't shared across instances; move to Redis/DB if abuse shows up.
-const hits = new Map<string, { n: number; reset: number }>();
-export function rateLimited(key: string, max: number, windowMs: number) {
-  const now = Date.now();
-  const h = hits.get(key);
-  if (!h || h.reset < now) {
-    if (hits.size > 10_000) hits.clear();
-    hits.set(key, { n: 1, reset: now + windowMs });
-    return false;
-  }
-  return ++h.n > max;
-}
+import { rateLimit } from "../rate-limit";
 
 /** Open, public, not past closesAt (Manila calendar day). */
 const listed = () => ({ status: "OPEN" as const, isPublic: true, slug: { not: null }, OR: [{ closesAt: null }, { closesAt: { gte: manilaToday() } }] });
@@ -35,7 +23,7 @@ const done: ApplyResult = { ok: true, data: undefined };
 
 /** Public application. Returns the same success for duplicates and honeypot hits so neither leaks. */
 export async function applyToVacancy(slug: string, fd: FormData, ip: string): Promise<ApplyResult> {
-  if (rateLimited(`apply:${ip}`, 5, 10 * 60_000)) return { ok: false, error: "Too many applications from your network. Please try again in a few minutes." };
+  if (!(await rateLimit(`apply:${ip}`, 5, 600)).ok) return { ok: false, error: "Too many applications from your network. Please try again in a few minutes." };
   if (String(fd.get("website") ?? "")) return done; // honeypot: bots fill every field
 
   const p = careersApplySchema.safeParse({
