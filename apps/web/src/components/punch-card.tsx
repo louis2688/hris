@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-type Policy = { requirePasskey: boolean; requirePhoto: boolean; requireLocation: boolean };
+type Policy = { requirePasskey: boolean; requirePhoto: boolean; requireLocation: boolean; requireGeofence?: boolean };
 
 /** Downscale a camera photo to a ~320px JPEG data URL (keeps DB rows small). */
 async function toSmallJpeg(file: File): Promise<string> {
@@ -66,14 +66,16 @@ export function PunchCard({ clockedIn, since, shiftLabel, timeZone, policy, hasP
       }
       let latitude: number | undefined;
       let longitude: number | undefined;
-      if (policy.requireLocation) {
+      let accuracy: number | undefined;
+      if (policy.requireLocation || policy.requireGeofence) {
         const pos = await position().catch(() => {
           throw new Error("Allow location access to punch");
         });
         latitude = pos.coords.latitude;
         longitude = pos.coords.longitude;
+        accuracy = pos.coords.accuracy;
       }
-      const r = await punchAction({ assertion, photo, latitude, longitude });
+      const r = await punchAction({ assertion, photo, latitude, longitude, accuracy });
       if (!r.ok) throw new Error(r.error);
       toast.success(`${r.message} at ${fmt(new Date(r.data.at), { hour: "2-digit", minute: "2-digit" })}`);
       if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(40);
@@ -113,9 +115,9 @@ export function PunchCard({ clockedIn, since, shiftLabel, timeZone, policy, hasP
               <Camera className="size-3.5" /> Selfie required
             </span>
           ) : null}
-          {policy.requireLocation ? (
+          {policy.requireLocation || policy.requireGeofence ? (
             <span className="inline-flex items-center gap-1">
-              <MapPin className="size-3.5" /> Location recorded
+              <MapPin className="size-3.5" /> {policy.requireGeofence ? "Must be at the office" : "Location recorded"}
             </span>
           ) : null}
           {!usePasskey && policy.requirePasskey === false ? (

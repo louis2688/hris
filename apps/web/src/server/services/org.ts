@@ -65,7 +65,7 @@ export const listLocations = () =>
   prisma.location.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { employees: { where: { deletedAt: null } } } } } });
 
 export async function saveLocation(actor: SessionUser, d: LocationInput, id?: string) {
-  const data = { name: d.name, address: d.address ?? null, city: d.city ?? null, country: d.country ?? null, timezone: d.timezone ?? null };
+  const data = { name: d.name, address: d.address ?? null, city: d.city ?? null, country: d.country ?? null, timezone: d.timezone ?? null, latitude: d.latitude ?? null, longitude: d.longitude ?? null, geofenceRadius: d.geofenceRadius ?? null };
   try {
     const row = id ? await prisma.location.update({ where: { id }, data }) : await prisma.location.create({ data });
     await audit(actor.id, id ? "location.update" : "location.create", "Location", row.id, { after: row });
@@ -91,7 +91,7 @@ export const listHolidays = (year: number) =>
   });
 
 export async function saveHoliday(actor: SessionUser, d: HolidayInput, id?: string) {
-  const data = { name: d.name, date: new Date(d.date), locationId: d.locationId ?? null };
+  const data = { name: d.name, type: d.type, date: new Date(d.date), locationId: d.locationId ?? null };
   try {
     const row = id ? await prisma.holiday.update({ where: { id }, data }) : await prisma.holiday.create({ data });
     await audit(actor.id, id ? "holiday.update" : "holiday.create", "Holiday", row.id, { after: row });

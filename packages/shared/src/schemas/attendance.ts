@@ -48,6 +48,7 @@ export const attendancePolicySchema = z.object({
   requirePasskey: bool,
   requirePhoto: bool,
   requireLocation: bool,
+  requireGeofence: bool,
 });
 export type AttendancePolicy = z.infer<typeof attendancePolicySchema>;
 

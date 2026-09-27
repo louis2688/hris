@@ -28,6 +28,7 @@ const punchSchema = z.object({
   photo: z.string().max(400_000).optional(), // data:image/jpeg;base64,... (client downsizes to ~320px)
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
+  accuracy: z.coerce.number().min(0).max(100_000).optional(),
 });
 
 export async function punchAction(input: z.input<typeof punchSchema>): Promise<ActionResult<{ direction: string; at: string }>> {
@@ -47,7 +48,7 @@ export async function punchAction(input: z.input<typeof punchSchema>): Promise<A
       photo = Buffer.from(m[2]!, "base64");
       if (method === "NONE") method = "PHOTO";
     }
-    const punch = await att.recordPunch(u, { method, photo, latitude: p.data.latitude, longitude: p.data.longitude });
+    const punch = await att.recordPunch(u, { method, photo, latitude: p.data.latitude, longitude: p.data.longitude, accuracy: p.data.accuracy });
     return { direction: punch.direction ?? "IN", at: punch.at.toISOString() };
   });
   revalidatePath("/attendance");

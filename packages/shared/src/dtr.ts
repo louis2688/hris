@@ -28,9 +28,13 @@ export interface DtrRow {
   lateMinutes: number;
   undertimeMinutes: number;
   overtimeMinutes: number;
+  /** Minutes worked between 22:00 and 06:00 local */
+  nightMinutes: number;
   punches: number;
-  leave: { code: string; days: number } | null;
+  leave: LeaveDay | null;
   holiday: string | null;
+  /** No shift scheduled (outside work days, or assigned a rest day) */
+  restDay: boolean;
 }
 
 export interface DtrTotals {
@@ -92,23 +96,68 @@ export function attendanceSlot(at: Date, shift: ShiftRule, timeZone: string) {
   return { day: shifted.date, minutes: shifted.minutes + offset };
 }
 
+export type LeaveDay = { code: string; days: number; paid?: boolean };
+
+/**
+ * Maps a punch to its attendance day + minutes from that day's local midnight (can be negative or exceed 1440).
+ * A day's window opens at its shift start - 4h (rest days use the base shift), or at the midpoint of the gap
+ * after the previous day's shift when that gap is shorter (night shift followed by a day shift).
+ * With one shift for every day this is exactly attendanceSlot.
+ */
+export function dayResolver(opts: { shift: ShiftRule; timeZone: string; assignments?: Map<string, ShiftRule | null> }) {
+  const { shift, timeZone, assignments } = opts;
+  const scheduled = (date: string): ShiftRule | null => {
+    if (assignments?.has(date)) return assignments.get(date)!;
+    return shift.workDays.includes(new Date(`${date}T00:00:00Z`).getUTCDay()) ? shift : null;
+  };
+  const mid = new Map<string, number>();
+  const midnight = (date: string) => mid.get(date) ?? mid.set(date, zonedToUtc(date, "00:00", timeZone).getTime()).get(date)!;
+  const opens = (date: string) => {
+    const s = hhmmToMin((scheduled(date) ?? shift).startTime);
+    let open = midnight(date) + (s - 240) * 60_000;
+    const prevDate = addDaysIso(date, -1);
+    const prev = scheduled(prevDate);
+    if (prev) {
+      const ps = hhmmToMin(prev.startTime);
+      let pe = hhmmToMin(prev.endTime);
+      if (pe <= ps) pe += 1440;
+      open = Math.max(open, (midnight(prevDate) + pe * 60_000 + midnight(date) + s * 60_000) / 2);
+    }
+    return open;
+  };
+  const resolve = (at: Date) => {
+    const local = zonedParts(at, timeZone).date;
+    const t = at.getTime();
+    const day = [addDaysIso(local, 1), local].find((d) => t >= opens(d)) ?? addDaysIso(local, -1);
+    return { day, minutes: Math.round((t - midnight(day)) / 60_000) };
+  };
+  return { scheduled, resolve };
+}
+
+/** Minutes of [a, b] (minutes from local midnight) that fall between 22:00 and 06:00. */
+export function nightOverlap(a: number, b: number) {
+  let n = 0;
+  for (let k = -1; k <= 2; k++) n += Math.max(0, Math.min(b, k * 1440 + 360) - Math.max(a, k * 1440 - 120));
+  return n;
+}
+
 export function computeDtr(input: {
   days: string[];
   punches: Date[];
   shift: ShiftRule;
   timeZone: string;
+  /** Non-working holidays (date -> name). Special working days are ordinary work days, so leave them out. */
   holidays: Map<string, string>;
-  leaves: Map<string, { code: string; days: number }>;
+  leaves: Map<string, LeaveDay>;
   today: string;
+  /** Per-day overrides: a shift (work day even if outside workDays) or null (rest day). */
+  assignments?: Map<string, ShiftRule | null>;
 }): { rows: DtrRow[]; totals: DtrTotals } {
-  const { shift, timeZone } = input;
-  const start = hhmmToMin(shift.startTime);
-  let end = hhmmToMin(shift.endTime);
-  if (end <= start) end += 1440;
+  const { scheduled, resolve } = dayResolver(input);
 
   const byDay = new Map<string, number[]>();
   for (const p of input.punches) {
-    const s = attendanceSlot(p, shift, timeZone);
+    const s = resolve(p);
     (byDay.get(s.day) ?? byDay.set(s.day, []).get(s.day)!).push(s.minutes);
   }
 
@@ -118,8 +167,13 @@ export function computeDtr(input: {
     const mins = (byDay.get(date) ?? []).sort((a, b) => a - b);
     const holiday = input.holidays.get(date) ?? null;
     const leave = input.leaves.get(date) ?? null;
-    const workDay = shift.workDays.includes(weekday) && !holiday;
-    const row: DtrRow = { date, weekday, status: "ABSENT", timeIn: null, timeOut: null, workedMinutes: 0, lateMinutes: 0, undertimeMinutes: 0, overtimeMinutes: 0, punches: mins.length, leave, holiday };
+    const dayShift = scheduled(date);
+    const shift = dayShift ?? input.shift;
+    const start = hhmmToMin(shift.startTime);
+    let end = hhmmToMin(shift.endTime);
+    if (end <= start) end += 1440;
+    const workDay = !!dayShift && !holiday;
+    const row: DtrRow = { date, weekday, status: "ABSENT", timeIn: null, timeOut: null, workedMinutes: 0, lateMinutes: 0, undertimeMinutes: 0, overtimeMinutes: 0, nightMinutes: 0, punches: mins.length, leave, holiday, restDay: !dayShift };
 
     if (mins.length) {
       const first = mins[0]!;
@@ -130,6 +184,8 @@ export function computeDtr(input: {
         const span = last - first;
         // ponytail: flat break deduction for spans over 5h; per-punch break tracking if payroll needs it.
         row.workedMinutes = Math.max(0, span - (span > 300 ? shift.breakMinutes : 0));
+        // ponytail: night minutes ignore where the break fell; capped at worked minutes.
+        row.nightMinutes = Math.min(row.workedMinutes, nightOverlap(first, last));
         row.status = "PRESENT";
         if (workDay) {
           const halfDay = leave && leave.days < 1;
@@ -148,7 +204,7 @@ export function computeDtr(input: {
       }
     } else if (holiday) row.status = "HOLIDAY";
     else if (leave && leave.days >= 1) row.status = "LEAVE";
-    else if (!shift.workDays.includes(weekday)) row.status = "REST_DAY";
+    else if (!dayShift) row.status = "REST_DAY";
     else if (date >= input.today) row.status = "UPCOMING";
     else if (leave) row.status = "LEAVE";
 
@@ -192,3 +248,55 @@ export interface DtrRangeTotals {
   holidays: { date: string; type: "REGULAR" | "SPECIAL_NON_WORKING" | "SPECIAL_WORKING"; workedMinutes: number }[];
   restDaysWorked: { date: string; workedMinutes: number }[];
 }
+
+export type HolidayType = DtrRangeTotals["holidays"][number]["type"];
+
+/**
+ * Payroll totals from DTR rows. `holidays` = every holiday applying to the employee in range (any type).
+ * present / absentDays / leave days count scheduled non-holiday work days only; rest-day and holiday work
+ * is listed separately (a holiday on a rest day shows in both lists). A half-day leave with no punches
+ * on a past work day counts 0.5 absent.
+ */
+export function rangeTotals(rows: DtrRow[], holidays: { date: string; type: HolidayType }[]): DtrRangeTotals {
+  const t: DtrRangeTotals = { workDays: 0, present: 0, absentDays: 0, paidLeaveDays: 0, unpaidLeaveDays: 0, lateMinutes: 0, undertimeMinutes: 0, workedMinutes: 0, nightMinutes: 0, holidays: [], restDaysWorked: [] };
+  const byDate = new Map(rows.map((r) => [r.date, r]));
+  for (const r of rows) {
+    t.lateMinutes += r.lateMinutes;
+    t.undertimeMinutes += r.undertimeMinutes;
+    t.workedMinutes += r.workedMinutes;
+    t.nightMinutes += r.nightMinutes;
+    if (r.restDay) {
+      if (r.workedMinutes > 0) t.restDaysWorked.push({ date: r.date, workedMinutes: r.workedMinutes });
+      continue;
+    }
+    if (r.holiday) continue;
+    t.workDays++;
+    if (r.status === "PRESENT" || r.status === "INCOMPLETE") t.present++;
+    if (r.status === "ABSENT") t.absentDays++;
+    if (r.status === "LEAVE" && r.leave && r.leave.days < 1) t.absentDays += 1 - r.leave.days;
+    if (r.leave) t[r.leave.paid === false ? "unpaidLeaveDays" : "paidLeaveDays"] += r.leave.days;
+  }
+  t.holidays = holidays.filter((h) => byDate.has(h.date)).map((h) => ({ date: h.date, type: h.type, workedMinutes: byDate.get(h.date)!.workedMinutes }));
+  return t;
+}
+
+// ---------- Geofence ----------
+
+/** Great-circle distance in meters. */
+export function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+export const fmtDistance = (m: number) => (m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`);
+
+/** Inside the fence? GPS accuracy (m, capped at 100) widens the radius so a noisy fix at the door still passes. */
+export function geofenceCheck(p: { lat: number; lng: number; accuracy?: number | null }, fence: { lat: number; lng: number; radius: number }) {
+  const distance = haversineMeters(p, fence);
+  return { inside: distance <= fence.radius + Math.min(Math.max(p.accuracy ?? 0, 0), 100), distance };
+}
+
+export * from "./anomalies";

@@ -3,7 +3,7 @@ import { prisma, type Prisma } from "@hris/db";
 import type { AttendancePolicy } from "@hris/shared";
 
 const DEFAULTS = {
-  attendance: { requirePasskey: false, requirePhoto: false, requireLocation: false } as AttendancePolicy,
+  attendance: { requirePasskey: false, requirePhoto: false, requireLocation: false, requireGeofence: false } as AttendancePolicy,
   /** Shown on payslips and certificates of employment. Edited in Settings > Payroll. */
   company: { name: "Your Company Inc.", address: "", tin: "", signatoryName: "", signatoryTitle: "HR Manager" },
 };
