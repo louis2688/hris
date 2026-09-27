@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@hris/db";
@@ -36,4 +37,16 @@ export async function changePasswordAction(_prev: ActionResult | undefined, fd: 
     await prisma.refreshToken.updateMany({ where: { userId: s.id, revokedAt: null }, data: { revokedAt: new Date() } });
     await audit(s.id, "auth.password_change", "User", s.id);
   }, "Password updated");
+}
+
+/** Remove a linked Google / Microsoft identity (own only). The next SSO sign-in with that email re-links it. */
+export async function unlinkIdentityAction(id: string): Promise<ActionResult> {
+  const s = await requireSession();
+  return run(async () => {
+    const idn = await prisma.userIdentity.findFirst({ where: { id, userId: s.id } });
+    if (!idn) throw new AppError("That sign-in method is already disconnected");
+    await prisma.userIdentity.delete({ where: { id } });
+    await audit(s.id, "auth.sso_unlink", "UserIdentity", id, { before: { provider: idn.provider } });
+    revalidatePath("/me/security");
+  }, "Disconnected");
 }

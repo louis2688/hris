@@ -36,3 +36,11 @@ eas build -p ios                               # needs an Apple developer accoun
 ```
 
 Set `EXPO_PUBLIC_API_URL` per profile under `build.<profile>.env` in `eas.json` (use HTTPS: release builds block plain HTTP). Change `ios.bundleIdentifier` / `android.package` in `app.json` before the first store build. EAS detects the pnpm workspace on its own; run builds from `apps/mobile`.
+
+## Push notifications
+
+After sign-in the app asks for notification permission (physical devices only), gets an Expo push token and registers it with `POST /api/v1/devices`; sign-out unregisters it. Tapping a notification opens Leave (`/me/leave`, or `/leave/<id>` for employees), Approvals (`/leave/<id>` for approvers), Attendance (`/attendance`), otherwise Home.
+
+- Needs an EAS project id: `eas init` writes `expo.extra.eas.projectId` into `app.json`. Without it the app skips push with a console warning.
+- Remote push does not work in Expo Go on Android (SDK 53+). Use a development build: `eas build -p android --profile development`.
+- Users can turn push off on the web under Security > Notifications.

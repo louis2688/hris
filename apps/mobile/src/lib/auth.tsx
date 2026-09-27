@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { loginSchema, type SessionUser } from "@hris/shared";
 import { api, loadUser, logout, saveSession, setSignedOutHandler } from "./api";
+import { registerForPush, unregisterPush } from "./push";
 
 type Auth = {
   user: SessionUser | null;
@@ -22,6 +23,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setReady(true));
   }, []);
 
+  // (Re)register this phone for push whenever someone is signed in; tokens can rotate between launches.
+  useEffect(() => {
+    if (user) void registerForPush();
+  }, [user?.id]);
+
   async function signIn(email: string, password: string) {
     const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Check your email and password");
@@ -31,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    await unregisterPush();
     await logout();
     setUser(null);
   }

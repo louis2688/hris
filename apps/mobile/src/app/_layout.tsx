@@ -1,10 +1,12 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { AuthProvider, isApprover, useAuth } from "@/lib/auth";
+import { useNotificationTaps } from "@/lib/push";
 import { C } from "@/lib/ui";
 
 function Nav() {
   const { user, ready } = useAuth();
+  useNotificationTaps(ready && !!user, isApprover(user));
   if (!ready) return null;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.canvas } }}>

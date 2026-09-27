@@ -134,3 +134,27 @@ Any Node host works (Vercel, Cloud Run, a VM). Set the env vars (DATABASE_URL, D
 ## Not in this release
 
 Payroll, document uploads, SSO, in-browser face recognition. The schema and service layer are laid out so these are additive modules.
+
+## Integrations
+
+Admins see the status of each one in Settings > Integrations (presence only, secret values are never shown).
+
+**Google / Microsoft sign-in** (OpenID Connect, auth code + PKCE + state + nonce). Nobody is auto-provisioned: a first SSO sign-in links to the ACTIVE user with the same email, later sign-ins match the linked identity. Users can disconnect it under Security. Password sign-in keeps working.
+
+| Env | |
+|---|---|
+| `APP_URL` | Public base URL, used to build the redirect URIs below |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Cloud Console > APIs & Services > Credentials > OAuth client (Web). Redirect URI: `<APP_URL>/api/auth/google/callback` |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | Entra ID > App registrations (Web platform). Redirect URI: `<APP_URL>/api/auth/microsoft/callback` |
+| `MICROSOFT_TENANT_ID` | Your directory (tenant) ID. Default `organizations` (any work account); then only the UPN (`preferred_username`) is trusted for linking. Pin it to also accept the `email` claim |
+| `SSO_ALLOWED_DOMAINS` | Optional, e.g. `acme.com,acme.ph`. Limits which email domains can be linked |
+
+A provider's button shows on the login page only when both its id and secret are set.
+
+**Mobile push** (Expo push service). The app registers its Expo push token via `POST /api/v1/devices` after sign-in and removes it on sign-out. Every in-app notification is also pushed unless the user turns push off under Security > Notifications.
+
+- Run `eas init` in `apps/mobile` so `expo.extra.eas.projectId` is in `app.json`; the app skips push without it.
+- Optional `EXPO_ACCESS_TOKEN` if you enable enhanced push security in your Expo account.
+- Remote push needs a development or store build. Expo Go (SDK 53+) doesn't receive remote push on Android.
+
+Tests: `node --test apps/web/src/server/auth/oidc.test.mjs` (state cookie, PKCE, id_token checks). `e2e/platform.spec.ts` runs a full Google round trip against a local mock provider when the server has `GOOGLE_CLIENT_ID=e2e GOOGLE_CLIENT_SECRET=e2e GOOGLE_ISSUER=http://localhost:3199 APP_URL=<base url>` and the tests get `E2E_MOCK_OIDC_PORT=3199`.

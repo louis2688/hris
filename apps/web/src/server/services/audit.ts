@@ -2,6 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import { prisma, type Prisma } from "@hris/db";
 import { renderEmail, sendMail } from "../mail";
+import { getPushOptIn, sendPush } from "../push";
 
 export async function audit(
   actorUserId: string | null,
@@ -35,10 +36,20 @@ export async function notify(userId: string | null | undefined, title: string, b
     console.error("notify failed", e);
   }
   // after() keeps the serverless fn alive past the response; it throws outside a request scope (scripts), so await there.
+  const deliver = () => Promise.all([emailUser(userId, title, body, link), pushUser(userId, title, body, link)]);
   try {
-    after(() => emailUser(userId, title, body, link));
+    after(deliver);
   } catch {
-    await emailUser(userId, title, body, link);
+    await deliver();
+  }
+}
+
+/** Push to the user's phones unless they opted out on /me/security. sendPush never throws. */
+async function pushUser(userId: string, title: string, body?: string, link?: string) {
+  try {
+    if (await getPushOptIn(userId)) await sendPush(userId, { title, body, data: link ? { link } : undefined });
+  } catch (e) {
+    console.error("notify push failed", e);
   }
 }
 

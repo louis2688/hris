@@ -9,14 +9,14 @@ test("employee toggles email notifications and it persists", async ({ page }) =>
 
   await box.setChecked(!was);
   await page.getByRole("button", { name: "Save preferences" }).click();
-  await expect(page.getByText(was ? "Email notifications off" : "Email notifications on")).toBeVisible();
+  await expect(page.getByText("Notification preferences saved")).toBeVisible();
   await page.reload();
   await expect(box).toBeChecked({ checked: !was });
 
   // restore so reruns start from the same state
   await box.setChecked(was);
   await page.getByRole("button", { name: "Save preferences" }).click();
-  await expect(page.getByText(was ? "Email notifications on" : "Email notifications off")).toBeVisible();
+  await expect(page.getByText("Notification preferences saved")).toBeVisible();
 });
 
 test("admin sees email config and filters the audit log", async ({ page }) => {
