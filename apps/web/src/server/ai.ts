@@ -70,8 +70,9 @@ export async function chat(o: ChatOpts): Promise<Reply> {
       signal: AbortSignal.timeout(stream ? 120_000 : 90_000),
     });
     if (!res.ok) {
-      const j = (await res.json().catch(() => null)) as { error?: { type?: string }; request_id?: string } | null;
-      console.error("ai: http", res.status, j?.error?.type, j?.request_id);
+      const j = (await res.json().catch(() => null)) as { error?: { type?: string; message?: string }; request_id?: string } | null;
+      // Anthropic's error message says why (bad model, no credit, bad schema) and never echoes the prompt.
+      console.error("ai: http", res.status, j?.error?.type, j?.request_id, j?.error?.message?.slice(0, 300));
       throw httpError(res.status);
     }
     return stream ? await readStream(res, o.onText!) : ((await res.json()) as Reply);
