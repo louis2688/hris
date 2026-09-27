@@ -16,7 +16,10 @@ const ITEMS: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/settings/projects", label: "Projects" },
   { href: "/settings/kpis", label: "KPIs" },
   { href: "/settings/review-cycles", label: "Review cycles" },
+  { href: "/settings/payroll", label: "Payroll" },
+  { href: "/settings/checklists", label: "Checklists" },
   { href: "/settings/email", label: "Email", adminOnly: true },
+  { href: "/settings/integrations", label: "Integrations", adminOnly: true },
   { href: "/settings/audit", label: "Audit log" },
 ];
 
