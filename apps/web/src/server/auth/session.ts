@@ -76,11 +76,25 @@ export const getSession = cache(async (): Promise<SessionUser | null> => {
   // Revalidate against DB so deactivation / role changes take effect immediately. The one DB hit per request.
   const user = await prisma.user.findUnique({
     where: { id: payload.id },
-    select: { id: true, email: true, role: true, isActive: true, employee: { select: { id: true, firstName: true, lastName: true, preferredName: true } } },
+    select: { id: true, email: true, role: true, isActive: true, sessionsValidAfter: true, employee: { select: { id: true, firstName: true, lastName: true, preferredName: true } } },
   });
   if (!user || !user.isActive) return null;
+  if (user.sessionsValidAfter && payload.iat * 1000 < user.sessionsValidAfter.getTime()) return null;
   return toSessionUser(user);
 });
+
+/**
+ * Kill every session of a user: tokens issued before now stop working. mobile=true also revokes refresh tokens
+ * (password change/reset); web logout keeps the phone signed in, its access token just refreshes.
+ * ponytail: second resolution (JWT iat), so a token minted in the same second survives; per-session rows if that ever matters.
+ */
+export async function endAllSessions(userId: string, { mobile = true } = {}) {
+  const now = new Date(Math.floor(Date.now() / 1000) * 1000);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { sessionsValidAfter: now } }),
+    ...(mobile ? [prisma.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } })] : []),
+  ]);
+}
 
 export async function requireSession(): Promise<SessionUser> {
   const s = await getSession();

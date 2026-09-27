@@ -198,3 +198,49 @@ test("pages ship a nonce CSP and still hydrate", async ({ page }) => {
   await expect(page).toHaveURL(/\/settings\/holidays/);
   expect(violations).toEqual([]);
 });
+
+test.describe("session kill", () => {
+  const PAOLO = "paolo.garcia@hris.local";
+
+  test("sign out kills a copied session cookie", async ({ browser }) => {
+    const a = await signedIn(browser, PAOLO);
+    const thief = await (await browser.newContext()).newPage();
+    await thief.context().addCookies(await a.context().cookies());
+    await thief.goto("/dashboard");
+    await expect(thief).toHaveURL(/\/dashboard/);
+
+    await a.locator("button[popovertarget]:visible").first().click();
+    await a.getByRole("button", { name: "Sign out" }).click();
+    await expect(a).toHaveURL(/\/login/);
+
+    await thief.goto("/dashboard");
+    await expect(thief).toHaveURL(/\/login/);
+  });
+
+  test("password change keeps this browser, kills other browsers and mobile tokens", async ({ browser, request }) => {
+    const NEW = "Rotated123!pw";
+    const mobile = await tokens(request, PAOLO);
+    const a = await signedIn(browser, PAOLO);
+    const b = await signedIn(browser, PAOLO);
+
+    async function change(from: string, to: string) {
+      await a.goto("/me/password");
+      await a.locator("#currentPassword").fill(from);
+      await a.locator("#newPassword").fill(to);
+      await a.locator("#confirmPassword").fill(to);
+      await a.getByRole("button", { name: "Update password" }).click();
+      await expect(a.getByText("Password updated")).toBeVisible();
+    }
+    await change(PASSWORD, NEW);
+    try {
+      await a.goto("/dashboard");
+      await expect(a).toHaveURL(/\/dashboard/);
+      await b.goto("/dashboard");
+      await expect(b).toHaveURL(/\/login/);
+      expect((await request.get("/api/v1/me", { headers: bearer(mobile.accessToken) })).status()).toBe(401);
+      expect((await request.post("/api/v1/auth/refresh", { data: { refreshToken: mobile.refreshToken } })).ok()).toBeFalsy();
+    } finally {
+      await change(NEW, PASSWORD);
+    }
+  });
+});

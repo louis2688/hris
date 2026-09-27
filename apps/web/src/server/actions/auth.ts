@@ -7,7 +7,7 @@ import { safeNext } from "../auth/oidc";
 import bcrypt from "bcryptjs";
 import { prisma } from "@hris/db";
 import { changePasswordSchema, loginSchema } from "@hris/shared";
-import { authenticate, clearSessionCookie, hashPassword, requireSession, setSessionCookie } from "../auth/session";
+import { authenticate, clearSessionCookie, endAllSessions, getSession, hashPassword, requireSession, setSessionCookie } from "../auth/session";
 import { audit } from "../services/audit";
 import { clientIp, loginLimit, loginRefund, tooManyMessage } from "../rate-limit";
 import { AppError } from "../services/errors";
@@ -28,7 +28,10 @@ export async function loginAction(_prev: ActionResult | undefined, fd: FormData)
   redirect(safeNext(next));
 }
 
+/** Signs out every browser: a copied cookie dies with this one. The mobile app stays signed in. */
 export async function logoutAction() {
+  const s = await getSession();
+  if (s) await endAllSessions(s.id, { mobile: false });
   await clearSessionCookie();
   redirect("/login");
 }
@@ -41,7 +44,8 @@ export async function changePasswordAction(_prev: ActionResult | undefined, fd: 
     const u = await prisma.user.findUniqueOrThrow({ where: { id: s.id } });
     if (!(await bcrypt.compare(p.data.currentPassword, u.passwordHash))) throw new AppError("Current password is incorrect");
     await prisma.user.update({ where: { id: s.id }, data: { passwordHash: await hashPassword(p.data.newPassword) } });
-    await prisma.refreshToken.updateMany({ where: { userId: s.id, revokedAt: null }, data: { revokedAt: new Date() } });
+    await endAllSessions(s.id);
+    await setSessionCookie(s); // keep this browser signed in, every other one is out
     await audit(s.id, "auth.password_change", "User", s.id);
   }, "Password updated");
 }

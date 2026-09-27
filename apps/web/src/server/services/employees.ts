@@ -9,7 +9,7 @@ import type {
   UpdateEmployeeInput,
   UpdateUserAccountInput,
 } from "@hris/shared";
-import { AuthError, hashPassword } from "../auth/session";
+import { AuthError, endAllSessions, hashPassword } from "../auth/session";
 import { audit } from "./audit";
 import { AppError, conflict, notFound } from "./errors";
 import { startDefaultChecklist } from "./onboarding";
@@ -281,7 +281,7 @@ export async function updateUserAccount(actor: SessionUser, employeeId: string, 
     data: { role: d.role, isActive: d.isActive, ...(d.resetPassword ? { passwordHash: await hashPassword(d.resetPassword) } : {}) },
     select: { id: true, email: true, role: true, isActive: true },
   });
-  if (d.resetPassword) await prisma.refreshToken.updateMany({ where: { userId: e.user.id, revokedAt: null }, data: { revokedAt: new Date() } });
+  if (d.resetPassword || !d.isActive) await endAllSessions(e.user.id);
   await audit(actor.id, "user.update", "User", e.user.id, { before: e.user, after });
   return after;
 }

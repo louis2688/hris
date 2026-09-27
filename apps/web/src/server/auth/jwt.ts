@@ -26,7 +26,7 @@ export async function signToken(user: SessionUser, kind: TokenKind): Promise<str
     .sign(secret());
 }
 
-export async function verifyToken(token: string): Promise<(SessionUser & { kind: TokenKind }) | null> {
+export async function verifyToken(token: string): Promise<(SessionUser & { kind: TokenKind; iat: number }) | null> {
   try {
     const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
     if (!payload.sub || typeof payload.role !== "string") return null;
@@ -37,6 +37,7 @@ export async function verifyToken(token: string): Promise<(SessionUser & { kind:
       employeeId: (payload.employeeId as string | null) ?? null,
       name: String(payload.name ?? ""),
       kind: (payload.kind as TokenKind) ?? "session",
+      iat: payload.iat ?? 0,
     };
   } catch {
     return null;

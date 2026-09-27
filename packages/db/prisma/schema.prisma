@@ -164,6 +164,8 @@ model User {
   role         Role      @default(EMPLOYEE)
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
+  /// Tokens issued before this are dead (logout, password change/reset).
+  sessionsValidAfter DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
