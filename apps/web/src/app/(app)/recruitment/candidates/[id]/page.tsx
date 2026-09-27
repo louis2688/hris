@@ -10,9 +10,14 @@ import { Card, CardBody, CardHeader, PageHeader } from "@/components/ui/card";
 import { StageBadge } from "@/components/stage-badge";
 import { DL } from "@/components/profile";
 import { fmtDate, fmtDateTime, fullName } from "@/lib/utils";
+import { aiProvider } from "@/server/ai";
+import { parseScreening } from "@/server/services/screening";
 import { CandidateActions, Interviews } from "./client";
+import { AiScreeningCard } from "./ai-screening";
 
 export const metadata: Metadata = { title: "Candidate" };
+// AI screening server actions run under this route; a PDF screen can take 30-60s.
+export const maxDuration = 90;
 
 export default async function CandidatePage({ params }: { params: Promise<{ id: string }> }) {
   const user = await gate("ADMIN", "HR");
@@ -71,19 +76,22 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
             interviews={c.interviews.map((i) => ({ id: i.id, title: i.title, scheduledAt: i.scheduledAt.toISOString(), interviewer: i.interviewer ? fullName(i.interviewer) : null, location: i.location, result: i.result, notes: i.notes }))}
           />
         </div>
-        <Card className="h-fit">
-          <CardHeader title="History" />
-          <ol className="divide-y divide-slate-100">
-            {c.history.map((h) => (
-              <li key={h.id} className="px-5 py-2.5 text-sm">
-                <p>{h.action.replace("candidate.", "").replace(/[._]/g, " ")}</p>
-                <p className="text-xs text-slate-500">
-                  {h.actor?.email ?? "system"} · {fmtDateTime(h.createdAt)}
-                </p>
-              </li>
-            ))}
-          </ol>
-        </Card>
+        <div className="space-y-6">
+          <AiScreeningCard candidateId={c.id} result={parseScreening(c.aiSummary)} screenedAt={c.aiScreenedAt?.toISOString() ?? null} configured={!!aiProvider()} />
+          <Card className="h-fit">
+            <CardHeader title="History" />
+            <ol className="divide-y divide-slate-100">
+              {c.history.map((h) => (
+                <li key={h.id} className="px-5 py-2.5 text-sm">
+                  <p>{h.action.replace("candidate.", "").replace(/[._]/g, " ")}</p>
+                  <p className="text-xs text-slate-500">
+                    {h.actor?.email ?? "system"} · {fmtDateTime(h.createdAt)}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </Card>
+        </div>
       </div>
     </div>
   );
