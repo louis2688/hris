@@ -13,7 +13,8 @@ export async function login(page: Page, email: string) {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  // ponytail: generous; bcrypt + cold dev compiles are slow when several servers share the box
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
 }
 
 /** Next Monday + offset weeks, as YYYY-MM-DD (avoids weekends/holiday collisions in tests). */
