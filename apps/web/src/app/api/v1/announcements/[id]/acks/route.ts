@@ -1,10 +1,10 @@
 import { handler } from "@/server/api";
 import { ackRows } from "@/server/services/announcements";
 
-/** Quote when needed; neutralise leading =+-@ so spreadsheet apps don't run it as a formula. */
+/** Quote when needed; neutralise leading =+-@, tab and CR so spreadsheet apps don't run it as a formula. */
 const cell = (raw: string) => {
-  const v = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
-  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  const v = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 };
 
 /** GET /api/v1/announcements/:id/acks -> CSV of every active user and whether they acknowledged. */

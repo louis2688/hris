@@ -4,10 +4,12 @@ import { listKpis } from "@/server/services/performance";
 import { deleteKpiAction, saveKpiAction } from "@/server/actions/performance";
 import { EntityManager } from "@/components/entity-manager";
 import { Badge } from "@/components/ui/card";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "KPIs" };
 
 export default async function KpisPage() {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const [kpis, titles] = await Promise.all([listKpis(), listJobTitles()]);
   return (
     <EntityManager

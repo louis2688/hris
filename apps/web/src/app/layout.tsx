@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Toaster } from "sonner";
 import { THEME_COOKIE, THEME_INIT_SCRIPT } from "@/components/theme-toggle";
 import "./globals.css";
@@ -24,10 +24,11 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Explicit choice comes from the cookie; no cookie = follow the OS (decided by the inline script).
   const theme = (await cookies()).get(THEME_COOKIE)?.value;
+  const nonce = (await headers()).get("x-nonce") ?? undefined; // set by proxy.ts for the CSP
   return (
     <html lang="en" className={theme === "dark" ? "dark" : undefined} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-dvh">
         {children}

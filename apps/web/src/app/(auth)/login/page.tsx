@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Building2 } from "lucide-react";
 import { getSession } from "@/server/auth/session";
-import { providerConfig } from "@/server/auth/oidc";
+import { providerConfig, safeNext } from "@/server/auth/oidc";
 import { buttonVariants } from "@/components/ui/button";
 import { LoginForm } from "./login-form";
 
@@ -35,7 +35,10 @@ const MicrosoftMark = () => (
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
   if (await getSession()) redirect("/dashboard");
-  const { next, error } = await searchParams;
+  const sp = await searchParams;
+  const error = sp.error;
+  // `/\evil.com` passes a naive startsWith("/") check but browsers resolve it off-site; same rule as SSO.
+  const next = typeof sp.next === "string" ? safeNext(sp.next) : undefined;
   const sso = [
     { id: "google", label: "Continue with Google", Mark: GoogleMark },
     { id: "microsoft", label: "Continue with Microsoft", Mark: MicrosoftMark },

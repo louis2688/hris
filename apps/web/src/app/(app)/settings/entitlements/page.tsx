@@ -6,10 +6,12 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { fullName } from "@/lib/utils";
 import { BulkEntitlementForm } from "./bulk-form";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "Entitlements" };
 
 export default async function EntitlementsPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const { year: y } = await searchParams;
   const year = Number(y) || new Date().getUTCFullYear();
   const [types, employees] = await Promise.all([

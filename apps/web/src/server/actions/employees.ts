@@ -63,7 +63,8 @@ export async function updateSelfAction(_p: ActionResult | undefined, fd: FormDat
 }
 
 export async function deleteEmployeeAction(id: string): Promise<ActionResult> {
-  const actor = await requireRole("ADMIN", "HR");
+  // Removal deactivates the login too; the page only offers it to ADMIN, so the action enforces the same.
+  const actor = await requireRole("ADMIN");
   const res = await run(() => svc.softDeleteEmployee(actor, id));
   if (!res.ok) return res;
   revalidatePath("/employees");

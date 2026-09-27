@@ -67,8 +67,11 @@ export function jwks(uri: string): JWTVerifyGetKey {
 export const randomToken = () => randomBytes(32).toString("base64url");
 export const pkceChallenge = (verifier: string) => createHash("sha256").update(verifier).digest("base64url");
 
-/** Only same-origin relative paths; anything else lands on the dashboard. */
-export const safeNext = (n?: string | null) => (n && n.startsWith("/") && !n.startsWith("//") && !n.startsWith("/\\") ? n : "/dashboard");
+/**
+ * Only same-origin relative paths; anything else lands on the dashboard.
+ * Backslashes and control chars are refused too: URL parsers turn "/\\x" into "//x" and drop tabs/newlines ("/\t/x" -> "//x").
+ */
+export const safeNext = (n?: string | null) => (n && /^\/(?![/\\])/.test(n) && !/[\u0000-\u001f\u007f\\]/.test(n) ? n : "/dashboard");
 
 // ---- State cookie: HS256 JWT with its own audience so it can never pass as a session token ----
 

@@ -5,6 +5,7 @@ import { listNationalities, listQualifications } from "@/server/services/qualifi
 import { deleteNationalityAction, deleteQualificationAction, saveNationalityAction, saveQualificationAction } from "@/server/actions/qualifications";
 import { EntityManager } from "@/components/entity-manager";
 import { cn } from "@/lib/utils";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "Qualifications" };
 
@@ -12,6 +13,7 @@ const TABS = [...QUALIFICATION_KINDS, "NATIONALITY"] as const;
 const LABEL: Record<(typeof TABS)[number], string> = { ...QUALIFICATION_LABELS, NATIONALITY: "Nationality" };
 
 export default async function QualificationsPage({ searchParams }: { searchParams: Promise<{ kind?: string }> }) {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const { kind: k } = await searchParams;
   const kind = (TABS as readonly string[]).includes(k ?? "") ? (k as (typeof TABS)[number]) : "SKILL";
 

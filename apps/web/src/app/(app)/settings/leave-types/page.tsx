@@ -5,10 +5,12 @@ import { saveLeaveTypeAction } from "@/server/actions/leave";
 import { EntityManager } from "@/components/entity-manager";
 import { Badge } from "@/components/ui/card";
 import { LeaveTypeDot } from "@/components/status-badge";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "Leave types" };
 
 export default async function LeaveTypesPage() {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const types = await listLeaveTypes();
   return (
     <EntityManager

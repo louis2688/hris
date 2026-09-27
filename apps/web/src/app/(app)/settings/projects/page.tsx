@@ -3,10 +3,12 @@ import { listProjects } from "@/server/services/timesheets";
 import { saveProjectAction } from "@/server/actions/attendance";
 import { EntityManager } from "@/components/entity-manager";
 import { Badge } from "@/components/ui/card";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "Projects" };
 
 export default async function ProjectsPage() {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const rows = await listProjects();
   return (
     <EntityManager

@@ -4,10 +4,12 @@ import { listFieldDefs } from "@/server/services/custom-fields";
 import { deactivateCustomFieldAction, saveCustomFieldAction } from "@/server/actions/lifecycle";
 import { EntityManager } from "@/components/entity-manager";
 import { Badge } from "@/components/ui/card";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "Custom fields" };
 
 export default async function CustomFieldsPage() {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const defs = await listFieldDefs();
   return (
     <EntityManager

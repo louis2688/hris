@@ -21,6 +21,9 @@ const TABS = [
   { key: "documents", label: "Documents" },
 ];
 
+// Only these reach the client form: the full row also carries HR-only notes and custom fields.
+const SELF_FIELDS = ["preferredName", "maritalStatus", "workEmail", "personalEmail", "phone", "mobile", "addressLine1", "addressLine2", "city", "state", "postalCode", "country"] as const;
+
 export default async function MePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const user = await requireSession();
   const { tab = "overview" } = await searchParams;
@@ -42,7 +45,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       {tab === "edit" ? (
         <Card>
           <CardBody>
-            <SelfEditForm e={e} />
+            <SelfEditForm e={Object.fromEntries(SELF_FIELDS.map((k) => [k, e[k]])) as Pick<typeof e, (typeof SELF_FIELDS)[number]>} />
           </CardBody>
         </Card>
       ) : tab === "qualifications" ? (

@@ -3,10 +3,12 @@ import { listLocations } from "@/server/services/org";
 import { deleteLocationAction, saveLocationAction } from "@/server/actions/org";
 import { EntityManager } from "@/components/entity-manager";
 import { Badge } from "@/components/ui/card";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "Locations" };
 
 export default async function LocationsPage() {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const rows = await listLocations();
   return (
     <EntityManager

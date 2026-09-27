@@ -6,10 +6,12 @@ import { EntityManager } from "@/components/entity-manager";
 import { ConfirmButton } from "@/components/action-form";
 import { fmtDate } from "@/lib/utils";
 import { CycleBadge } from "../../performance/review-badge";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "Review cycles" };
 
 export default async function ReviewCyclesPage() {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const cycles = await listCycles();
   return (
     <EntityManager

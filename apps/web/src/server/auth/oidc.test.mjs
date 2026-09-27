@@ -32,7 +32,9 @@ test("state cookie round-trips and rejects tampering", async () => {
 
 test("safeNext blocks open redirects", () => {
   assert.equal(safeNext("/leave/1"), "/leave/1");
-  for (const bad of ["//evil.com", "/\\evil.com", "https://evil.com", "", null]) assert.equal(safeNext(bad), "/dashboard");
+  assert.equal(safeNext("/me?tab=documents"), "/me?tab=documents");
+  for (const bad of ["//evil.com", "/\\evil.com", "https://evil.com", "", null, "/\t/evil.com", "/\n/evil.com", "/\r//evil.com", "/a\\b"]) assert.equal(safeNext(bad), "/dashboard");
+  for (const bad of ["/\t/evil.com", "/\\evil.com"]) assert.equal(new URL(bad, "https://hris.example").host, "evil.com"); // why they are refused
 });
 
 test("pkce challenge is unpadded base64url(sha256)", () => {

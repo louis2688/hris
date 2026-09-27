@@ -1,24 +1,31 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { safeNext } from "../auth/oidc";
 import bcrypt from "bcryptjs";
 import { prisma } from "@hris/db";
 import { changePasswordSchema, loginSchema } from "@hris/shared";
 import { authenticate, clearSessionCookie, hashPassword, requireSession, setSessionCookie } from "../auth/session";
 import { audit } from "../services/audit";
+import { clientIp, loginLimit, loginRefund, tooManyMessage } from "../rate-limit";
 import { AppError } from "../services/errors";
 import { formToObject, parse, run, type ActionResult } from "./_helpers";
 
 export async function loginAction(_prev: ActionResult | undefined, fd: FormData): Promise<ActionResult> {
   const p = parse(loginSchema, formToObject(fd));
   if ("error" in p) return p.error;
+  const ip = clientIp(await headers());
+  const lim = await loginLimit(p.data.email, ip);
+  if (!lim.ok) return { ok: false, error: tooManyMessage(lim.retryAfterSec) };
   const user = await authenticate(p.data.email, p.data.password);
   if (!user) return { ok: false, error: "Invalid email or password" };
+  await loginRefund(p.data.email, ip);
   await setSessionCookie(user);
   await audit(user.id, "auth.login", "User", user.id);
   const next = String(fd.get("next") ?? "");
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
+  redirect(safeNext(next));
 }
 
 export async function logoutAction() {

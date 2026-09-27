@@ -37,7 +37,7 @@ async function takeChallenge(userId: string, purpose: "reg" | "auth") {
   jar.delete(CHALLENGE_COOKIE);
   if (!token) throw new AppError("Verification expired, try again", "CHALLENGE_EXPIRED");
   try {
-    const { payload } = await jwtVerify(token, secret());
+    const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
     if (payload.sub !== userId || payload.p !== purpose) throw new Error();
     return String(payload.c);
   } catch {

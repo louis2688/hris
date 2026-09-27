@@ -28,7 +28,7 @@ export async function signToken(user: SessionUser, kind: TokenKind): Promise<str
 
 export async function verifyToken(token: string): Promise<(SessionUser & { kind: TokenKind }) | null> {
   try {
-    const { payload } = await jwtVerify(token, secret());
+    const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
     if (!payload.sub || typeof payload.role !== "string") return null;
     return {
       id: payload.sub,

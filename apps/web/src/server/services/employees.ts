@@ -9,7 +9,7 @@ import type {
   UpdateEmployeeInput,
   UpdateUserAccountInput,
 } from "@hris/shared";
-import { hashPassword } from "../auth/session";
+import { AuthError, hashPassword } from "../auth/session";
 import { audit } from "./audit";
 import { AppError, conflict, notFound } from "./errors";
 import { startDefaultChecklist } from "./onboarding";
@@ -100,6 +100,18 @@ export async function getEmployee(id: string) {
 
 export type EmployeeDetail = Awaited<ReturnType<typeof getEmployee>>;
 
+/** HR-internal: never leaves the server for non-staff. */
+const HR_ONLY = ["notes", "customFields"] as const;
+/** Pay, government IDs and bank details: the employee themselves and HR/Admin only. */
+const OWNER_ONLY = ["basicPay", "allowance", "payType", "tin", "sssNo", "philhealthNo", "pagibigNo", "bankName", "bankAccountNo", "biometricId"] as const;
+
+/** Strip fields the viewer may not read (JSON APIs return the whole row; the web pages pick fields themselves). */
+export function employeeForViewer<T extends { id: string }>(u: SessionUser, e: T): Partial<T> {
+  if (u.role === "ADMIN" || u.role === "HR") return e;
+  const drop = new Set<string>([...HR_ONLY, ...(e.id === u.employeeId ? [] : OWNER_ONLY)]);
+  return Object.fromEntries(Object.entries(e).filter(([k]) => !drop.has(k))) as Partial<T>;
+}
+
 /** Active employees for dropdowns (manager picker etc). */
 export async function employeeOptions() {
   return prisma.employee.findMany({
@@ -159,6 +171,8 @@ export async function createEmployee(actor: SessionUser, d: CreateEmployeeInput,
   if (d.managerId === "") d.managerId = undefined;
 
   const loginEmail = d.createAccount ? (d.loginEmail ?? d.workEmail) : undefined;
+  // Roles are an admin power (updateUserAccount is ADMIN-only); HR must not mint admin logins via create / hire.
+  if (d.createAccount && d.role === "ADMIN" && actor.role !== "ADMIN") throw new AuthError("Only an admin can create admin accounts", 403);
   if (d.createAccount) {
     if (!loginEmail) throw new AppError("A login email is required to create an account");
     if (await prisma.user.findUnique({ where: { email: loginEmail } })) throw conflict("Login email already in use");

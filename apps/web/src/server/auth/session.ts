@@ -117,14 +117,28 @@ export async function issueRefreshToken(userId: string, userAgent?: string | nul
   return raw;
 }
 
-/** Rotate: revoke the presented token, return a fresh pair. */
+/**
+ * Rotate: revoke the presented token, return a fresh pair.
+ * Reuse of an already-rotated token means it leaked (or two clients share it): revoke every token of that user.
+ */
 export async function rotateRefreshToken(raw: string, userAgent?: string | null) {
   const row = await prisma.refreshToken.findUnique({
     where: { tokenHash: sha256(raw) },
     include: { user: { include: { employee: { select: { id: true, firstName: true, lastName: true, preferredName: true } } } } },
   });
-  if (!row || row.revokedAt || row.expiresAt < new Date() || !row.user.isActive) return null;
-  await prisma.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } });
+  if (!row) return null;
+  const revokeAll = () => prisma.refreshToken.updateMany({ where: { userId: row.userId, revokedAt: null }, data: { revokedAt: new Date() } });
+  if (row.revokedAt) {
+    await revokeAll();
+    return null;
+  }
+  if (row.expiresAt < new Date() || !row.user.isActive) return null;
+  // Conditional update so two concurrent refreshes with the same token cannot both win.
+  const won = await prisma.refreshToken.updateMany({ where: { id: row.id, revokedAt: null }, data: { revokedAt: new Date() } });
+  if (won.count !== 1) {
+    await revokeAll();
+    return null;
+  }
   const user = toSessionUser(row.user);
   return { user, accessToken: await signToken(user, "access"), refreshToken: await issueRefreshToken(user.id, userAgent) };
 }

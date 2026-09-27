@@ -15,6 +15,25 @@ export function apiError(status: number, code: string, message: string, details?
   return json({ error: { code, message, ...(details ? { details } : {}) } }, status);
 }
 
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * CSRF guard for cookie-authenticated writes (same check Next applies to server actions): a browser always sends
+ * Origin on cross-origin POST/PATCH/DELETE, so a mismatching Origin with no bearer token is refused.
+ * Bearer (mobile) calls and non-browser clients without Origin are unaffected.
+ */
+export function crossSiteCookieWrite(req: NextRequest) {
+  if (SAFE_METHODS.has(req.method) || req.headers.get("authorization")?.startsWith("Bearer ")) return false;
+  const origin = req.headers.get("origin");
+  if (!origin) return false;
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  try {
+    return new URL(origin).host !== host;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Wrap a route handler: resolves the user (cookie or bearer), enforces roles,
  * converts thrown errors to JSON. Public routes pass `roles: null`.
@@ -28,6 +47,7 @@ export function handler<P extends Record<string, string> = Record<string, string
       const params = await route.params;
       let user: SessionUser | null = null;
       if (opts.roles !== null) {
+        if (crossSiteCookieWrite(req)) return apiError(403, "FORBIDDEN", "Cross-origin request blocked");
         user = await getSession();
         if (!user) return apiError(401, "UNAUTHENTICATED", "Sign in required");
         if (opts.roles && !opts.roles.includes(user.role)) return apiError(403, "FORBIDDEN", "Insufficient role");

@@ -33,7 +33,8 @@ export const candidateSchema = z.object({
   phone: opt(40),
   vacancyId: opt(),
   source: opt(80),
-  resumeUrl: z.url("Must be a link").optional().or(z.literal("")).transform((v) => (v ? v : undefined)),
+  // http(s) only: z.url() alone accepts javascript: and data: URLs, and this lands in an <a href>.
+  resumeUrl: z.url({ protocol: /^https?$/, error: "Must be a link" }).optional().or(z.literal("")).transform((v) => (v ? v : undefined)),
   notes: opt(2000),
   referrerId: opt(),
 });

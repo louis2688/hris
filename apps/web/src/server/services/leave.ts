@@ -164,9 +164,10 @@ export const leaveRequestInclude = {
 export type LeaveRequestRow = Prisma.LeaveRequestGetPayload<{ include: typeof leaveRequestInclude }>;
 
 export async function listLeaveRequests(q: LeaveListQuery, restrictTo: string[] | null) {
+  // An employeeId filter narrows the caller's scope; it must never replace it (?employeeId=<anyone> IDOR).
+  const ids = q.employeeId ? [q.employeeId].filter((id) => !restrictTo || restrictTo.includes(id)) : restrictTo;
   const where: Prisma.LeaveRequestWhereInput = {
-    ...(restrictTo ? { employeeId: { in: restrictTo } } : {}),
-    ...(q.employeeId ? { employeeId: q.employeeId } : {}),
+    ...(ids ? { employeeId: { in: ids } } : {}),
     ...(q.status ? { status: q.status } : {}),
     ...(q.leaveTypeId ? { leaveTypeId: q.leaveTypeId } : {}),
     ...(q.departmentId ? { employee: { departmentId: q.departmentId } } : {}),

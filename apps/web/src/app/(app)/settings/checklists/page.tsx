@@ -5,10 +5,12 @@ import { deleteTemplateAction } from "@/server/actions/people";
 import { ConfirmButton } from "@/components/action-form";
 import { Badge, Card, CardHeader, EmptyState } from "@/components/ui/card";
 import { AddItemForm, ItemRow, TemplateDialog } from "./client";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "Checklists" };
 
 export default async function ChecklistsSettingsPage() {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const templates = await listTemplates();
   return (
     <div className="space-y-6">

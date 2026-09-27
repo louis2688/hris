@@ -10,10 +10,12 @@ import { EntityManager } from "@/components/entity-manager";
 import { Badge } from "@/components/ui/card";
 import { PolicyForm } from "./policy-form";
 import { Devices } from "./devices";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "Attendance settings" };
 
 export default async function AttendanceSettingsPage() {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const [policy, shifts, devices, locations, h] = await Promise.all([getSetting("attendance"), listShifts(), listDevices(), listLocations(), headers()]);
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "your-domain";
   return (

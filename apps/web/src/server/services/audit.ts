@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { prisma, type Prisma } from "@hris/db";
 import { renderEmail, sendMail } from "../mail";
 import { getPushOptIn, sendPush } from "../push";
+import { auditSafe } from "../redact";
 
 export async function audit(
   actorUserId: string | null,
@@ -19,8 +20,8 @@ export async function audit(
         action,
         entity,
         entityId,
-        before: data.before === undefined ? undefined : (JSON.parse(JSON.stringify(data.before)) as Prisma.InputJsonValue),
-        after: data.after === undefined ? undefined : (JSON.parse(JSON.stringify(data.after)) as Prisma.InputJsonValue),
+        before: auditSafe(data.before) as Prisma.InputJsonValue | undefined,
+        after: auditSafe(data.after) as Prisma.InputJsonValue | undefined,
       },
     });
   } catch (e) {

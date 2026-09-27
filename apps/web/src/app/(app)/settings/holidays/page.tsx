@@ -6,10 +6,12 @@ import { deleteHolidayAction, saveHolidayAction } from "@/server/actions/org";
 import { EntityManager } from "@/components/entity-manager";
 import { buttonVariants } from "@/components/ui/button";
 import { fmtDate } from "@/lib/utils";
+import { gate } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "Holidays" };
 
 export default async function HolidaysPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
+  await gate("ADMIN", "HR"); // layouts are skipped on client navigations, so each page guards itself
   const { year: y } = await searchParams;
   const year = Number(y) || new Date().getUTCFullYear();
   const [holidays, locations] = await Promise.all([listHolidays(year), listLocations()]);
