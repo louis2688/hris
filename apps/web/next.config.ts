@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // ponytail: lets parallel dev servers use separate build dirs (NEXT_DIST_DIR=.next-foo)
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   transpilePackages: ["@hris/shared", "@hris/db"],
   serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg", "bcryptjs"],
   typedRoutes: false,

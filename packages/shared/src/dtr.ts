@@ -174,3 +174,21 @@ export function monthDays(month: string): string[] {
 }
 
 export { addDaysIso };
+
+/** Per-employee attendance totals over an arbitrary date range (payroll cutoffs). Contract between attendance and payroll. */
+export interface DtrRangeTotals {
+  /** Scheduled work days in range (excludes rest days and holidays) */
+  workDays: number;
+  present: number;
+  absentDays: number;
+  paidLeaveDays: number;
+  unpaidLeaveDays: number;
+  lateMinutes: number;
+  undertimeMinutes: number;
+  workedMinutes: number;
+  /** Minutes worked between 22:00 and 06:00 local */
+  nightMinutes: number;
+  /** Holidays in range with whether/how long the employee worked them */
+  holidays: { date: string; type: "REGULAR" | "SPECIAL_NON_WORKING" | "SPECIAL_WORKING"; workedMinutes: number }[];
+  restDaysWorked: { date: string; workedMinutes: number }[];
+}

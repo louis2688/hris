@@ -263,3 +263,13 @@ export async function deleteShift(actor: SessionUser, id: string) {
   await prisma.workShift.delete({ where: { id } });
   await audit(actor.id, "shift.delete", "WorkShift", id);
 }
+
+/**
+ * Attendance totals per employee for [from, to] (YYYY-MM-DD, inclusive), honoring per-day shift
+ * assignments, holidays (with type) and approved leave. Used by payroll.
+ * TODO(attendance agent): implement. Signature is a contract with payroll; do not change it.
+ */
+export async function dtrTotalsForRange(employeeIds: string[], from: string, to: string): Promise<Map<string, import("@hris/shared").DtrRangeTotals>> {
+  void employeeIds; void from; void to;
+  throw new Error("dtrTotalsForRange not implemented yet");
+}
