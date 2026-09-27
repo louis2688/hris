@@ -112,7 +112,14 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             today={today}
             days={grid.days}
             shifts={grid.shifts}
-            rows={grid.rows.map((r) => ({ id: r.id, name: fullName(r), code: r.employeeCode, dept: r.department?.name ?? null, editable: r.editable, days: r.days, availability: r.availability }))}
+            rows={grid.rows.map((r) => ({
+              id: r.id,
+              name: fullName(r),
+              sub: r.department?.name ?? r.employeeCode,
+              editable: r.editable,
+              days: r.days.map((d) => ({ date: d.date, v: d.override ? (d.shift?.id ?? "REST") : "", base: d.base?.id ?? null, hol: d.holiday?.name ?? null })),
+              ...(Object.keys(r.availability).length ? { availability: r.availability } : {}),
+            }))}
           />
         </Card>
       ) : null}

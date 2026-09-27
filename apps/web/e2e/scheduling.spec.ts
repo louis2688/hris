@@ -25,6 +25,7 @@ async function setRoster(page: Page, cells: [name: string, date: string, label: 
   for (const [name, date, label] of cells) {
     const sel = page.getByLabel(`${name} ${date}`);
     const before = await sel.inputValue();
+    await sel.focus(); // cells render their full option list on focus / hover
     if (label === null) await sel.selectOption("");
     else await sel.selectOption({ label });
     dirty ||= before !== (await sel.inputValue());
