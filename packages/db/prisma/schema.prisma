@@ -1901,3 +1901,15 @@ model DocumentAck {
   @@id([documentId, userId])
   @@index([userId])
 }
+
+// ---------- Hardening (2026-10) ----------
+
+/// Fixed-window rate limit counters shared across serverless instances
+model RateLimit {
+  /// e.g. "login:ip:1.2.3.4" or "assistant:user:abc"
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
+}
