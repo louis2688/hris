@@ -11,7 +11,7 @@ export function ProfileHero({ e, actions }: { e: EmployeeDetail; actions?: React
     <Card className="mb-6 overflow-hidden">
       <div className="h-20 bg-ink" aria-hidden />
       <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <Avatar first={e.firstName} last={e.lastName} src={e.avatarUrl} size="xl" className="-mt-14 shrink-0 ring-4 ring-white" />
+        <Avatar first={e.firstName} last={e.lastName} src={e.avatarUrl} size="xl" className="-mt-14 shrink-0 ring-4 ring-card" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-display text-[26px] font-bold leading-[1.05] tracking-[-0.02em]">{fullName(e)}</h1>
@@ -42,7 +42,7 @@ export function TabNav({ base, tabs, active }: { base: string; tabs: { key: stri
               href={t.key === tabs[0]?.key ? base : `${base}?tab=${t.key}`}
               className={cn(
                 "inline-block whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
-                active === t.key ? "bg-white text-ink shadow-card" : "text-slate-600 hover:text-ink",
+                active === t.key ? "bg-card text-ink shadow-card" : "text-slate-600 hover:text-ink",
               )}
               aria-current={active === t.key ? "page" : undefined}
             >

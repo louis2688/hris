@@ -52,7 +52,7 @@ export function Roster({ week, today, days, shifts, rows }: { week: string; toda
           <tbody className="divide-y divide-slate-100">
             {rows.map((r) => (
               <tr key={r.id}>
-                <th scope="row" className="sticky left-0 z-10 bg-white px-4 py-2 text-left font-normal">
+                <th scope="row" className="sticky left-0 z-10 bg-card px-4 py-2 text-left font-normal">
                   <p className="max-w-36 truncate text-sm font-medium text-ink">{r.name}</p>
                   <p className="max-w-36 truncate text-xs text-slate-500">{r.dept ?? r.code}</p>
                 </th>
@@ -71,7 +71,7 @@ export function Roster({ week, today, days, shifts, rows }: { week: string; toda
                         value={v}
                         onChange={(e) => setCells((m) => new Map(m).set(key, e.target.value))}
                         className={cn(
-                          "select-chevron h-9 w-full min-w-[104px] appearance-none truncate rounded-lg border bg-white pl-2 pr-5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus disabled:cursor-not-allowed disabled:bg-canvas",
+                          "select-chevron h-9 w-full min-w-[104px] appearance-none truncate rounded-lg border bg-card pl-2 pr-5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus disabled:cursor-not-allowed disabled:bg-canvas",
                           dirty ? "border-brand-600 ring-1 ring-brand-600" : v ? "border-ink font-semibold text-ink" : "border-hairline text-slate-500",
                           v === "REST" && "bg-bone",
                           d.holiday && "border-dashed",

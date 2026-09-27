@@ -84,7 +84,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             ) : (
               rows.map(({ emp, days: ed }) => (
                 <tr key={emp.id}>
-                  <td className="sticky left-0 z-10 bg-white px-3 py-1.5">
+                  <td className="sticky left-0 z-10 bg-card px-3 py-1.5">
                     <Link href={`/employees/${emp.id}`} className="flex items-center gap-2 hover:text-brand-700">
                       <Avatar first={emp.firstName} last={emp.lastName} src={emp.avatarUrl} size="sm" />
                       <span className="truncate text-sm">{fullName(emp)}</span>

@@ -179,7 +179,7 @@ export function OrgTree({ people, departments, linkable }: { people: OrgPerson[]
         </div>
       </div>
 
-      <div ref={scroller} className="overflow-x-auto rounded-2xl bg-white px-4 py-6 ring-1 ring-hairline scrollbar-thin sm:px-6">
+      <div ref={scroller} className="overflow-x-auto rounded-2xl bg-card px-4 py-6 ring-1 ring-hairline scrollbar-thin sm:px-6">
         {roots.length === 0 ? (
           <p className="py-10 text-center text-sm text-slate-500">Nobody in this department yet.</p>
         ) : (
@@ -192,7 +192,7 @@ export function OrgTree({ people, departments, linkable }: { people: OrgPerson[]
           <summary className="mb-3 cursor-pointer text-sm font-semibold text-slate-700">No manager set ({loners.length})</summary>
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {loners.map((p) => (
-              <li key={p.id} id={`org-${p.id}`} className={cn("flex items-center gap-3 rounded-xl bg-white px-3 py-2.5 ring-1 ring-hairline", focusId === p.id && "ring-2 ring-brand-600")}>
+              <li key={p.id} id={`org-${p.id}`} className={cn("flex items-center gap-3 rounded-xl bg-card px-3 py-2.5 ring-1 ring-hairline", focusId === p.id && "ring-2 ring-brand-600")}>
                 <Avatar first={p.first} last={p.last} src={p.avatarUrl} size="sm" />
                 <span className="min-w-0">
                   {linkable ? (
@@ -221,7 +221,7 @@ function Node({ p, reports, open, onToggle, highlight, linkable }: { p: OrgPerso
     <div
       id={`org-${p.id}`}
       className={cn(
-        "relative w-[196px] rounded-xl bg-white px-3 pb-3 pt-3 text-center ring-1 ring-hairline transition-shadow",
+        "relative w-[196px] rounded-xl bg-card px-3 pb-3 pt-3 text-center ring-1 ring-hairline transition-shadow",
         highlight && "ring-2 ring-brand-600 shadow-float",
       )}
     >

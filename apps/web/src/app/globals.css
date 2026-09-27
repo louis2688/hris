@@ -3,6 +3,9 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";
 
+/* Class-based dark mode: <html class="dark"> (cookie hris_theme, see ThemeToggle). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
   Design tokens (DESIGN.md, Replicate-inspired, adapted for an app):
   warm cream canvas, ink type, white cards on hairlines (no shadows on cream),
@@ -44,8 +47,21 @@
   --color-on-dark: #fcfcfc;
   --color-focus: rgb(59 130 246 / 0.5);
   --color-surface: #f9f7f3;
+  --color-card: #ffffff;
   --color-ink: #202020;
   --color-ink-muted: #575757;
+
+  /* semantic chip tones: warm, desaturated, AA on cream */
+  --color-tone-green-bg: #e5f2ea;
+  --color-tone-green-fg: #1a6641;
+  --color-tone-amber-bg: #f8edd5;
+  --color-tone-amber-fg: #7a4f05;
+  --color-tone-red-bg: #f9e4df;
+  --color-tone-red-fg: #a3261a;
+  --color-tone-blue-bg: #e6ecf4;
+  --color-tone-blue-fg: #2d4f7c;
+  --color-tone-violet-bg: #eee8f4;
+  --color-tone-violet-fg: #5a3f82;
 
   --radius-xl: 10px;
   --radius-2xl: 16px;
@@ -110,6 +126,63 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+/*
+  Dark theme: the same tokens, inverted. Because pages only use tokens
+  (slate-*, canvas, bone, card, ink, hairline, tone-*), flipping them here
+  restyles every screen. Warm near-black canvas, bone-tinted cards, light ink.
+*/
+@media screen {
+  html.dark {
+    color-scheme: dark;
+
+    --color-canvas: #151412;
+    --color-surface: #151412;
+    --color-bone: #1e1d1a;
+    --color-card: #1c1b18;
+    --color-hairline: rgb(255 255 255 / 0.11);
+    --color-ink: #f0ede6;
+    --color-ink-muted: #b3b0a9;
+    --color-on-dark: #1a1917;
+    --color-focus: rgb(96 165 250 / 0.55);
+
+    --color-slate-50: #1e1d1a;
+    --color-slate-100: #262521;
+    --color-slate-200: #34322d;
+    --color-slate-300: #5f5d58;
+    --color-slate-400: #8d8b85;
+    --color-slate-500: #a8a59e;
+    --color-slate-600: #bcb9b1;
+    --color-slate-700: #d3d0c8;
+    --color-slate-800: #e3e0d8;
+    --color-slate-900: #f0ede6;
+    --color-slate-950: #faf8f4;
+
+    --color-tone-green-bg: #163526;
+    --color-tone-green-fg: #7fd3a6;
+    --color-tone-amber-bg: #3a2c0d;
+    --color-tone-amber-fg: #f0c063;
+    --color-tone-red-bg: #40201b;
+    --color-tone-red-fg: #f39d92;
+    --color-tone-blue-bg: #1d2a3d;
+    --color-tone-blue-fg: #9dbbe6;
+    --color-tone-violet-bg: #2c2340;
+    --color-tone-violet-fg: #c4ace6;
+
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.11);
+    --shadow-float: 0 16px 40px -16px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.1);
+  }
+  html.dark ::selection {
+    background: #3d0a01;
+    color: #ffdfd4;
+  }
+  html.dark .glass {
+    background: rgb(21 20 18 / 0.85);
+  }
+  html.dark .select-chevron {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8a59e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
   }
 }
 

@@ -21,7 +21,7 @@ export function DialogContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-[2px]" />
       <DialogPrimitive.Content
         className={cn(
-          "fixed z-50 flex max-h-[92dvh] w-full flex-col bg-white shadow-float focus:outline-none animate-fade-up",
+          "fixed z-50 flex max-h-[92dvh] w-full flex-col bg-card shadow-float focus:outline-none animate-fade-up",
           // bottom sheet on mobile, centered modal on desktop
           "inset-x-0 bottom-0 rounded-t-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl",
           className,

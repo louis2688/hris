@@ -107,7 +107,7 @@ export default async function AuditLogPage({ searchParams }: { searchParams: Pro
                               {(["before", "after"] as const).map((side) => (
                                 <div key={side} className="min-w-0">
                                   <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">{side === "before" ? "Before" : "After"}</p>
-                                  <pre className="max-h-80 overflow-auto rounded-xl bg-white p-3 font-mono text-xs text-slate-700 ring-1 ring-slate-200">{json(r[side])}</pre>
+                                  <pre className="max-h-80 overflow-auto rounded-xl bg-card p-3 font-mono text-xs text-slate-700 ring-1 ring-slate-200">{json(r[side])}</pre>
                                 </div>
                               ))}
                             </div>

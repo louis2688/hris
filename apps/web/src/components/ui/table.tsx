@@ -19,7 +19,7 @@ export const TD = ({ className, ...p }: React.TdHTMLAttributes<HTMLTableCellElem
 
 export function Pagination({ page, totalPages, total, makeHref }: { page: number; totalPages: number; total: number; makeHref: (page: number) => string }) {
   if (totalPages <= 1) return <p className="px-4 py-3 text-xs text-slate-500">{total} result{total === 1 ? "" : "s"}</p>;
-  const btn = "rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-ink ring-1 ring-inset ring-hairline hover:bg-canvas aria-disabled:pointer-events-none aria-disabled:opacity-40";
+  const btn = "rounded-full bg-card px-3.5 py-1.5 text-xs font-semibold text-ink ring-1 ring-inset ring-hairline hover:bg-canvas aria-disabled:pointer-events-none aria-disabled:opacity-40";
   return (
     <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
       <p className="text-xs text-slate-500">

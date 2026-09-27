@@ -93,7 +93,7 @@ export default async function AnnouncementsPage() {
                   {a.requiresAck ? (
                     <div className="mx-5 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-bone px-4 py-3">
                       {acked ? (
-                        <p className="inline-flex items-center gap-2 text-sm font-medium text-[#1a6641]">
+                        <p className="inline-flex items-center gap-2 text-sm font-medium text-tone-green-fg">
                           <CheckCircle2 className="size-4" /> You acknowledged this on {fmtDate(acked)}
                         </p>
                       ) : (

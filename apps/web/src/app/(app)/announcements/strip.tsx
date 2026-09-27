@@ -12,7 +12,7 @@ export async function AnnouncementStrip({ user }: { user: SessionUser }) {
     <div className="mb-6 space-y-2">
       {a ? (
         <Link href="/announcements" className="group flex items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-on-dark transition-colors hover:bg-slate-800 sm:px-5">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card/10">
             <Megaphone className="size-4" />
           </span>
           <span className="min-w-0 flex-1">
@@ -23,7 +23,7 @@ export async function AnnouncementStrip({ user }: { user: SessionUser }) {
         </Link>
       ) : null}
       {openTasks ? (
-        <Link href="/onboarding" className="group flex items-center gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-hairline transition-colors hover:bg-canvas sm:px-5">
+        <Link href="/onboarding" className="group flex items-center gap-3 rounded-2xl bg-card px-4 py-3 ring-1 ring-hairline transition-colors hover:bg-canvas sm:px-5">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-bone">
             <ListChecks className="size-4" />
           </span>

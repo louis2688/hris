@@ -77,7 +77,7 @@ export default async function LeavePage({ searchParams }: { searchParams: Promis
         </form>
       </Card>
       <LeaveRequestList items={data.items} emptyText="No requests match these filters." />
-      <div className="mt-2 rounded-xl border border-slate-200 bg-white">
+      <div className="mt-2 rounded-xl border border-slate-200 bg-card">
         <Pagination page={data.page} totalPages={data.totalPages} total={data.total} makeHref={(p) => `/leave${toSearchParams({ ...raw, page: p })}`} />
       </div>
     </>

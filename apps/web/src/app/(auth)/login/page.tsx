@@ -51,7 +51,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <h1 className="font-display text-[40px] font-bold leading-none tracking-[-0.03em] text-ink">Welcome back</h1>
           <p className="mt-3 text-sm text-ink-muted">Sign in with your company account</p>
         </div>
-        <div className="rounded-2xl bg-white p-6 ring-1 ring-hairline">
+        <div className="rounded-2xl bg-card p-6 ring-1 ring-hairline">
           {ssoError ? (
             <p className="mb-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
               {ssoError}

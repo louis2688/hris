@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { cn, fmtDateTime } from "@/lib/utils";
 
-const TONE = { green: "bg-[#e5f2ea] text-[#1a6641]", amber: "bg-[#f8edd5] text-[#7a4f05]", red: "bg-[#f9e4df] text-[#a3261a]" };
+const TONE = { green: "bg-tone-green-bg text-tone-green-fg", amber: "bg-tone-amber-bg text-tone-amber-fg", red: "bg-tone-red-bg text-tone-red-fg" };
 
 export function AiScreeningCard({ candidateId, result, screenedAt, configured }: { candidateId: string; result: ScreeningResult | null; screenedAt: string | null; configured: boolean }) {
   const [pending, start] = React.useTransition();

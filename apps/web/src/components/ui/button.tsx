@@ -11,7 +11,7 @@ const buttonVariants = cva(
         default: "bg-ink text-on-dark hover:bg-slate-700",
         // ponytail: orange is scarce - one per screen (login submit, clock in/out).
         brand: "bg-brand-600 text-white hover:bg-brand-700",
-        secondary: "bg-white text-ink ring-1 ring-inset ring-ink hover:bg-canvas",
+        secondary: "bg-card text-ink ring-1 ring-inset ring-ink hover:bg-canvas",
         ghost: "text-ink hover:bg-ink/5",
         destructive: "bg-red-600 text-white hover:bg-red-700",
         success: "bg-[#23845a] text-white hover:bg-[#1c6b49]",

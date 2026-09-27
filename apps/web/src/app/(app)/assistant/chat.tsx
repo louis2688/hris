@@ -137,7 +137,7 @@ export function Chat({ firstName, mock }: { firstName: string; mock: boolean }) 
               }
             }}
             placeholder="Ask a question"
-            className="max-h-40 min-h-11 flex-1 resize-none rounded-3xl border border-hairline bg-white px-5 py-2.5 text-[15px] text-ink placeholder:text-slate-400 focus-visible:border-ink focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus sm:text-sm"
+            className="max-h-40 min-h-11 flex-1 resize-none rounded-3xl border border-hairline bg-card px-5 py-2.5 text-[15px] text-ink placeholder:text-slate-400 focus-visible:border-ink focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus sm:text-sm"
           />
           <Button type="submit" variant="brand" size="icon" loading={busy} disabled={!input.trim()} aria-label="Send">
             {busy ? null : <ArrowUp />}

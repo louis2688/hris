@@ -50,7 +50,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
         <PrintButton label="Print / Save as PDF" />
       </div>
 
-      <article className="mx-auto flex w-full sm:min-h-[297mm] max-w-[210mm] flex-col bg-white px-6 py-8 font-serif text-[15px] leading-relaxed text-ink shadow-float sm:px-[20mm] sm:py-[18mm] print:min-h-0 print:max-w-none print:p-0 print:shadow-none">
+      <article className="mx-auto flex w-full sm:min-h-[297mm] max-w-[210mm] flex-col bg-card px-6 py-8 font-serif text-[15px] leading-relaxed text-ink shadow-float sm:px-[20mm] sm:py-[18mm] print:min-h-0 print:max-w-none print:p-0 print:shadow-none">
         <header className="border-b-2 border-ink pb-4 text-center">
           <p className="font-display text-2xl font-bold tracking-[-0.01em]">{company.name}</p>
           {company.address ? <p className="mt-1 text-sm text-slate-600">{company.address}</p> : null}

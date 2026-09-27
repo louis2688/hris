@@ -19,7 +19,7 @@ export default async function QualificationsPage({ searchParams }: { searchParam
     <div className="space-y-4">
       <nav className="inline-flex gap-1 rounded-full bg-slate-100 p-1" aria-label="Qualification type">
         {TABS.map((t) => (
-          <Link key={t} href={`/settings/qualifications?kind=${t}`} className={cn("rounded-full px-3.5 py-1.5 text-sm font-medium", t === kind ? "bg-white text-ink shadow-card" : "text-slate-600 hover:text-ink")}>
+          <Link key={t} href={`/settings/qualifications?kind=${t}`} className={cn("rounded-full px-3.5 py-1.5 text-sm font-medium", t === kind ? "bg-card text-ink shadow-card" : "text-slate-600 hover:text-ink")}>
             {LABEL[t]}s
           </Link>
         ))}

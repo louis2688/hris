@@ -22,7 +22,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 
   const href = (patch: Record<string, string | undefined>) => `/onboarding${toSearchParams({ kind: q.kind, overdue: q.overdue ? "1" : undefined, status: q.status === "completed" ? "completed" : undefined, ...patch })}`;
   const pill = (active: boolean) =>
-    cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors", active ? "bg-ink text-on-dark" : "bg-white text-slate-700 ring-1 ring-inset ring-hairline hover:bg-canvas");
+    cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors", active ? "bg-ink text-on-dark" : "bg-card text-slate-700 ring-1 ring-inset ring-hairline hover:bg-canvas");
 
   return (
     <>
@@ -73,7 +73,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
             const pct = c.total ? Math.round((c.done / c.total) * 100) : 0;
             return (
               <li key={c.id}>
-                <Link href={`/onboarding/${c.id}`} className="block h-full rounded-2xl bg-white p-5 ring-1 ring-hairline transition-shadow hover:shadow-float focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus">
+                <Link href={`/onboarding/${c.id}`} className="block h-full rounded-2xl bg-card p-5 ring-1 ring-hairline transition-shadow hover:shadow-float focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus">
                   <div className="flex items-start gap-3">
                     <Avatar first={c.employee.firstName} last={c.employee.lastName} src={c.employee.avatarUrl} />
                     <div className="min-w-0 flex-1">
@@ -85,7 +85,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
                     <span className="font-medium tabular-nums text-ink">
                       {c.done}/{c.total} done
                     </span>
-                    {c.overdue ? <span className="text-xs font-medium text-[#a3261a]">{c.overdue} overdue</span> : c.completedAt ? <span className="text-xs text-[#1a6641]">Completed</span> : null}
+                    {c.overdue ? <span className="text-xs font-medium text-tone-red-fg">{c.overdue} overdue</span> : c.completedAt ? <span className="text-xs text-tone-green-fg">Completed</span> : null}
                   </div>
                   <div className="mt-1.5 h-2 rounded-full bg-slate-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progress">
                     <div className={cn("h-2 rounded-full", pct === 100 ? "bg-[#2b9a66]" : "bg-ink")} style={{ width: `${pct}%` }} />

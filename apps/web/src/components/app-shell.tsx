@@ -39,6 +39,7 @@ import {
 import type { SessionUser } from "@hris/shared";
 import { ROLE_LABELS } from "@hris/shared";
 import { logoutAction } from "@/server/actions/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; roles?: SessionUser["role"][]; group: "me" | "manage" };
@@ -158,13 +159,14 @@ export function AppShell({ user, unread, children }: { user: SessionUser; unread
               <span className="font-display text-lg font-bold tracking-[-0.02em]">HRIS</span>
             </div>
             <div className="ml-auto flex items-center gap-2">
+              <ThemeToggle />
               <Link href="/dashboard#notifications" className="relative flex size-10 items-center justify-center rounded-full text-ink hover:bg-ink/5" aria-label={`${unread} unread notifications`}>
                 <Bell className="size-5" />
                 {unread > 0 ? <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-red-500 ring-2 ring-canvas" /> : null}
               </Link>
               <div className="hidden items-center gap-2 lg:flex">
                 <span className="text-sm font-medium text-ink">{user.name}</span>
-                <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-inset ring-hairline">{ROLE_LABELS[user.role]}</span>
+                <span className="rounded-full bg-card px-2.5 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-inset ring-hairline">{ROLE_LABELS[user.role]}</span>
               </div>
             </div>
           </header>
@@ -208,7 +210,7 @@ function UserMenu({ user }: { user: SessionUser }) {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger className="flex w-full items-center gap-3 rounded-full px-2 py-2 text-left transition-colors hover:bg-ink/5">
-        <span className="flex size-9 items-center justify-center rounded-full bg-white text-xs font-semibold text-ink ring-1 ring-hairline">
+        <span className="flex size-9 items-center justify-center rounded-full bg-card text-xs font-semibold text-ink ring-1 ring-hairline">
           {user.name
             .split(" ")
             .map((p) => p[0])
@@ -223,7 +225,7 @@ function UserMenu({ user }: { user: SessionUser }) {
         <ChevronDown className="size-4 text-slate-400" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content sideOffset={8} align="start" className="z-50 w-56 rounded-2xl bg-white p-1.5 shadow-float">
+        <DropdownMenu.Content sideOffset={8} align="start" className="z-50 w-56 rounded-2xl bg-card p-1.5 shadow-float">
           <div className="px-3 py-2">
             <p className="truncate text-xs text-slate-500">{user.email}</p>
           </div>

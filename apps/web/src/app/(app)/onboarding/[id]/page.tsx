@@ -111,7 +111,7 @@ export default async function ChecklistPage({ params }: { params: Promise<{ id: 
                         <span className={cn("block text-sm font-medium", t.doneAt ? "text-slate-500 line-through decoration-slate-300" : "text-ink")}>{t.title}</span>
                         <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                           <Badge tone={OWNER_TONE[t.owner]}>{TASK_OWNER_LABELS[t.owner]}</Badge>
-                          {t.dueDate ? <span className={overdue ? "font-medium text-[#a3261a]" : undefined}>{overdue ? "Overdue · " : "Due "}{fmtDate(t.dueDate)}</span> : null}
+                          {t.dueDate ? <span className={overdue ? "font-medium text-tone-red-fg" : undefined}>{overdue ? "Overdue · " : "Due "}{fmtDate(t.dueDate)}</span> : null}
                           {t.doneAt ? (
                             <span>
                               Done {fmtDateTime(t.doneAt)}

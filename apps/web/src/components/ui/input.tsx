@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 export const inputClass =
-  "flex h-11 w-full rounded-full border border-hairline bg-white px-5 py-2 text-[15px] text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-slate-400 hover:border-slate-300 focus-visible:border-ink focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus disabled:cursor-not-allowed disabled:bg-bone disabled:text-slate-500 aria-invalid:border-red-500 sm:text-sm";
+  "flex h-11 w-full rounded-full border border-hairline bg-card px-5 py-2 text-[15px] text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-slate-400 hover:border-slate-300 focus-visible:border-ink focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-focus disabled:cursor-not-allowed disabled:bg-bone disabled:text-slate-500 aria-invalid:border-red-500 sm:text-sm";
 
 export function Input({ className, type = "text", ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input type={type} className={cn(inputClass, className)} {...props} />;

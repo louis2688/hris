@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-2xl bg-white ring-1 ring-hairline", className)} {...props} />;
+  return <div className={cn("rounded-2xl bg-card ring-1 ring-hairline", className)} {...props} />;
 }
 
 export function CardHeader({ className, title, description, action }: { className?: string; title: React.ReactNode; description?: React.ReactNode; action?: React.ReactNode }) {
@@ -25,11 +25,11 @@ export function Badge({ className, tone = "slate", children }: { className?: str
   const tones = {
     // warm, desaturated tones that sit on cream; text/bg pairs clear WCAG AA
     slate: "bg-canvas text-ink ring-1 ring-inset ring-hairline",
-    green: "bg-[#e5f2ea] text-[#1a6641]",
-    amber: "bg-[#f8edd5] text-[#7a4f05]",
-    red: "bg-[#f9e4df] text-[#a3261a]",
-    blue: "bg-[#e6ecf4] text-[#2d4f7c]",
-    violet: "bg-[#eee8f4] text-[#5a3f82]",
+    green: "bg-tone-green-bg text-tone-green-fg",
+    amber: "bg-tone-amber-bg text-tone-amber-fg",
+    red: "bg-tone-red-bg text-tone-red-fg",
+    blue: "bg-tone-blue-bg text-tone-blue-fg",
+    violet: "bg-tone-violet-bg text-tone-violet-fg",
   };
   const dot = { slate: "bg-slate-400", green: "bg-[#2b9a66]", amber: "bg-[#d4940f]", red: "bg-[#d4402b]", blue: "bg-[#5577a6]", violet: "bg-[#8166ad]" };
   return (
