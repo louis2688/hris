@@ -9,7 +9,7 @@ Tabs: Home, Attendance (clock in/out + DTR), Leave, Approvals (managers, HR, adm
 ```bash
 pnpm install                                   # from the repo root
 pnpm --filter @hris/web dev                    # API on :3000 (or use the deployed URL)
-EXPO_PUBLIC_API_URL=http://192.168.1.20:3000 pnpm --filter @hris/mobile dev
+EXPO_PUBLIC_API_URL=http://192.168.1.20:3000 pnpm dev:mobile
 ```
 
 Scan the QR code with Expo Go (Android) or the Camera app (iOS).
