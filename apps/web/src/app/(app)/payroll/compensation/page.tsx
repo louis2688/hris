@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { gate } from "@/server/auth/session";
-import { listCompensation } from "@/server/services/payroll";
+import { listCompensation, today } from "@/server/services/payroll";
 import { PageHeader } from "@/components/ui/card";
 import { fullName } from "@/lib/utils";
 import { CompensationTable } from "./table";
@@ -20,6 +20,7 @@ export default async function CompensationPage() {
       </Link>
       <PageHeader title="Compensation" description={missing ? `${missing} employee${missing > 1 ? "s have" : " has"} no basic pay and will be skipped by payroll` : "Pay basis and government numbers used by payroll"} />
       <CompensationTable
+        today={today()}
         rows={rows.map((r) => ({
           id: r.id,
           name: fullName(r),
@@ -32,6 +33,9 @@ export default async function CompensationPage() {
           sssNo: r.sssNo,
           philhealthNo: r.philhealthNo,
           pagibigNo: r.pagibigNo,
+          bankName: r.bankName,
+          bankAccountNo: r.bankAccountNo,
+          upcoming: r.upcoming,
         }))}
       />
     </>

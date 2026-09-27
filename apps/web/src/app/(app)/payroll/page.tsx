@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Settings2, Users } from "lucide-react";
+import { ListPlus, Settings2, Users } from "lucide-react";
 import { gate } from "@/server/auth/session";
 import { listRuns, suggestNextRun } from "@/server/services/payroll";
 import { buttonVariants } from "@/components/ui/button";
@@ -26,6 +26,9 @@ export default async function PayrollPage() {
           <>
             <Link href="/payroll/compensation" className={buttonVariants({ variant: "secondary" })}>
               <Users /> Compensation
+            </Link>
+            <Link href="/payroll/adjustments" className={buttonVariants({ variant: "secondary" })}>
+              <ListPlus /> Adjustments
             </Link>
             <Link href="/settings/payroll" className={buttonVariants({ variant: "ghost" })}>
               <Settings2 /> Rates

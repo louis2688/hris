@@ -4,6 +4,7 @@
  * so HR can update them in Settings > Payroll without a deploy.
  */
 import type { DtrRangeTotals } from "./dtr";
+import { LOAN_TYPE_LABELS } from "./schemas/requests";
 
 export type TaxBracket = { over: number; base: number; rate: number };
 
@@ -61,6 +62,13 @@ export interface PayrollConfig {
   thirteenthMonthExempt: number;
   /** Pay days: day of month for the 1st-15th and 16th-end cutoffs (0 = last day of month). */
   schedule: { frequency: "SEMI_MONTHLY" | "MONTHLY"; firstPayDay: number; secondPayDay: number };
+  /**
+   * Withholding on off-cycle runs (bonuses paid outside cutoffs).
+   * TABLE: the monthly table applied on top of the employee's monthly basic, tax(basic + amount) - tax(basic),
+   * so the amount is taxed at the employee's own marginal bracket (same method as the 13th-month excess).
+   * FLAT: taxable amount x flatRate.
+   */
+  offCycleTax: { method: "TABLE" | "FLAT"; flatRate: number };
 }
 
 export const DEFAULT_PAYROLL_CONFIG: PayrollConfig = {
@@ -102,6 +110,7 @@ export const DEFAULT_PAYROLL_CONFIG: PayrollConfig = {
   contributionTiming: "SPLIT",
   thirteenthMonthExempt: 90000,
   schedule: { frequency: "SEMI_MONTHLY", firstPayDay: 15, secondPayDay: 0 },
+  offCycleTax: { method: "TABLE", flatRate: 0.2 },
 };
 
 /** Stored config merged over defaults group by group (a partial or older stored value never drops a rate). */
@@ -117,6 +126,7 @@ export function mergePayrollConfig(stored: unknown): PayrollConfig {
     tax: { ...D.tax, ...s.tax },
     premiums: { ...D.premiums, ...s.premiums },
     schedule: { ...D.schedule, ...s.schedule },
+    offCycleTax: { ...D.offCycleTax, ...s.offCycleTax },
   };
 }
 
@@ -161,14 +171,32 @@ export function withholdingTax(taxable: number, brackets: TaxBracket[]): number 
 // ---------- Payslip ----------
 
 export type PayslipLine = {
-  kind: "earning" | "deduction" | "employer";
+  /** info: shown but not part of gross/deductions (e.g. amount due from a leaver) */
+  kind: "earning" | "deduction" | "employer" | "info";
   code: string;
   label: string;
   amount: number;
   qty?: number;
-  /** Loan id / expense claim id this line settles */
+  /** Loan id / expense claim id / benefit enrollment id / asset id this line settles */
   ref?: string;
+  /** PayrollAdjustment paid by this line (one-offs are marked applied on finalize) */
+  adjustmentId?: string;
+  /** Earning excluded from taxable income */
+  nonTaxable?: true;
+  /** Deduction that reduces taxable income */
+  preTax?: true;
 };
+
+/** Earnings/deductions picked up by payroll. taxable: an earning is taxed; a deduction reduces taxable income. */
+export type AdjustmentInput = { id?: string; kind: "EARNING" | "DEDUCTION"; code: string; label: string; amount: number; taxable: boolean; qty?: number; ref?: string };
+
+export type TaxMethod =
+  | { kind: "PERIOD" }
+  /** Off-cycle: marginal monthly table over monthly basic */
+  | { kind: "MARGINAL"; monthlyBasic: number }
+  | { kind: "FLAT"; rate: number }
+  /** Final pay: annual table on YTD + this payslip, minus tax already withheld (may refund) */
+  | { kind: "ANNUALIZED"; ytdTaxable: number; ytdWithheld: number };
 
 export interface PayslipInput {
   payType: "MONTHLY" | "DAILY";
@@ -187,6 +215,15 @@ export interface PayslipInput {
   loans: { id: string; label: string; amortization: number; balance: number }[];
   expenses: { id: string; label: string; amount: number }[];
   config: PayrollConfig;
+  adjustments?: AdjustmentInput[];
+  /** Active benefit enrollments: monthly employee share, split per cutoff like contributions (code HMO_EE) */
+  benefits?: { id: string; label: string; monthly: number }[];
+  /** Monthly-paid basic = daily rate x paid days in the period instead of half/full month (final pay, off-cycle) */
+  partial?: boolean;
+  noContributions?: boolean;
+  /** Final pay: loans are deducted at their full balance and nothing is capped; a shortfall becomes AMOUNT_DUE */
+  settle?: boolean;
+  tax?: TaxMethod;
 }
 
 export interface PayslipResult {
@@ -200,6 +237,8 @@ export interface PayslipResult {
   withholdingTax: number;
   totalDeductions: number;
   netPay: number;
+  /** Deductions above gross (final pay only); net pay is then 0 */
+  amountDue?: number;
 }
 
 const hhmm = (s: string) => {
@@ -227,8 +266,10 @@ const DAY_LABEL: Record<DayKind, string> = {
   REGULAR_HOLIDAY_REST: "Regular holiday + rest day OT",
 };
 
+const weekday = (date: string) => new Date(`${date}T00:00:00Z`).getUTCDay();
+
 function dayKind(date: string, dtr: DtrRangeTotals, workDays: number[]): DayKind {
-  const rest = dtr.restDaysWorked.some((r) => r.date === date) || !workDays.includes(new Date(`${date}T00:00:00Z`).getUTCDay());
+  const rest = dtr.restDaysWorked.some((r) => r.date === date) || !workDays.includes(weekday(date));
   const h = dtr.holidays.find((x) => x.date === date && x.type !== "SPECIAL_WORKING");
   if (h?.type === "REGULAR") return rest ? "REGULAR_HOLIDAY_REST" : "REGULAR_HOLIDAY";
   if (h?.type === "SPECIAL_NON_WORKING") return rest ? "SPECIAL_REST" : "SPECIAL";
@@ -248,6 +289,16 @@ function multipliers(kind: DayKind, p: PayrollConfig["premiums"]): { day: number
 
 const hrs = (min: number) => Math.round((min / 60) * 100) / 100;
 
+/** Daily rate: the daily rate itself, or monthly x 12 / days-per-year for monthly-paid. */
+export const dailyRateOf = (payType: "MONTHLY" | "DAILY", basicPay: number, cfg: PayrollConfig) => (payType === "DAILY" ? basicPay : P(C((basicPay * 12) / cfg.daysPerYear)));
+export const monthlyBasicOf = (payType: "MONTHLY" | "DAILY", basicPay: number, cfg: PayrollConfig) => (payType === "DAILY" ? (basicPay * cfg.daysPerYear) / 12 : basicPay);
+
+/** Annual table = monthly table x 12 (RR 11-2018 annual table, within a few pesos of rounding). */
+export const annualTax = (taxable: number, cfg: PayrollConfig) => withholdingTax(taxable, cfg.tax.monthly.map((b) => ({ over: b.over * 12, base: b.base * 12, rate: b.rate })));
+
+/** DTR totals of an empty period (off-cycle runs, final pay after the last full cutoff). */
+export const EMPTY_DTR: DtrRangeTotals = { workDays: 0, present: 0, absentDays: 0, paidLeaveDays: 0, unpaidLeaveDays: 0, lateMinutes: 0, undertimeMinutes: 0, workedMinutes: 0, nightMinutes: 0, holidays: [], restDaysWorked: [] };
+
 export function computePayslip(i: PayslipInput): PayslipResult {
   const cfg = i.config;
   const semi = i.frequency === "SEMI_MONTHLY";
@@ -255,24 +306,29 @@ export function computePayslip(i: PayslipInput): PayslipResult {
   // Daily rate in centavos; monthly-paid: monthly x 12 / days-per-year.
   const dailyC = i.payType === "DAILY" ? C(i.basicPay) : C((i.basicPay * 12) / cfg.daysPerYear);
   const minuteC = dailyC / dayMin;
-  const monthlyBasic = i.payType === "DAILY" ? (i.basicPay * cfg.daysPerYear) / 12 : i.basicPay;
+  const monthlyBasic = monthlyBasicOf(i.payType, i.basicPay, cfg);
   const d = i.dtr;
 
   const earn: PayslipLine[] = [];
   const add = (code: string, label: string, centavos: number, qty?: number, taxable = true) => {
     if (Math.round(centavos) === 0) return 0;
-    earn.push({ kind: "earning", code, label, amount: P(centavos), ...(qty !== undefined ? { qty } : {}) });
+    earn.push({ kind: "earning", code, label, amount: P(centavos), ...(qty !== undefined ? { qty } : {}), ...(taxable ? {} : { nonTaxable: true as const }) });
     return taxable ? Math.round(centavos) : 0;
   };
 
   let basicC: number;
   let taxableC = 0;
+  let paidDays: number; // days actually paid, for the pro-rated allowance of a partial period
   if (i.payType === "MONTHLY") {
-    basicC = C(semi ? i.basicPay / 2 : i.basicPay);
-    taxableC += add("BASIC", "Basic pay", basicC);
+    // Partial period: the 261/313 factor pays scheduled days and the holidays that fall on them.
+    paidDays = d.workDays + d.holidays.filter((h) => h.type !== "SPECIAL_WORKING" && i.workDays.includes(weekday(h.date))).length;
+    basicC = i.partial ? dailyC * paidDays : C(semi ? i.basicPay / 2 : i.basicPay);
+    taxableC += add("BASIC", "Basic pay", basicC, i.partial ? paidDays : undefined);
+    paidDays -= d.absentDays + d.unpaidLeaveDays;
   } else {
     const days = Math.max(0, d.workDays - d.absentDays - d.unpaidLeaveDays);
     basicC = dailyC * days;
+    paidDays = days;
     taxableC += add("BASIC", "Basic pay", basicC, days);
   }
 
@@ -338,47 +394,98 @@ export function computePayslip(i: PayslipInput): PayslipResult {
   const ndC = Math.round(minuteC * ndMin * cfg.premiums.nightDiff) + otNightC;
   taxableC += add("NIGHTDIFF", "Night differential", ndC, hrs(ndMin + otNightTotal));
 
-  // Non-taxable
-  add("ALLOWANCE", "De minimis allowance", C(semi ? i.allowance / 2 : i.allowance), undefined, false);
-  for (const e of i.expenses) {
-    earn.push({ kind: "earning", code: "REIMBURSE", label: e.label, amount: P(C(e.amount)), ref: e.id });
+  // Adjustments (bonus, arrears, leave encashment, referral bonus, 13th month on final pay...)
+  const adjDeductions: AdjustmentInput[] = [];
+  for (const a of i.adjustments ?? []) {
+    if (a.kind === "DEDUCTION") {
+      adjDeductions.push(a);
+      continue;
+    }
+    const c = C(a.amount);
+    if (c <= 0) continue;
+    earn.push({ kind: "earning", code: a.code, label: a.label, amount: P(c), ...(a.qty !== undefined ? { qty: a.qty } : {}), ...(a.ref ? { ref: a.ref } : {}), ...(a.id ? { adjustmentId: a.id } : {}), ...(a.taxable ? {} : { nonTaxable: true as const }) });
+    if (a.taxable) taxableC += c;
   }
 
-  const grossC = earn.reduce((s, l) => s + C(l.amount), 0);
+  // Non-taxable
+  // Partial period: monthly allowance x 12 / days-per-year for each paid day.
+  add("ALLOWANCE", "De minimis allowance", i.partial ? Math.round(C((i.allowance * 12) / cfg.daysPerYear) * Math.max(0, paidDays)) : C(semi ? i.allowance / 2 : i.allowance), undefined, false);
+  for (const e of i.expenses) {
+    earn.push({ kind: "earning", code: "REIMBURSE", label: e.label, amount: P(C(e.amount)), ref: e.id, nonTaxable: true });
+  }
+
+  let grossC = earn.reduce((s, l) => s + C(l.amount), 0);
 
   // Contributions: monthly amounts, split per cutoff.
   const sss = sssContribution(monthlyBasic, cfg.sss);
   const ph = philhealthContribution(monthlyBasic, cfg.philhealth);
   const hdmf = pagibigContribution(monthlyBasic, cfg.pagibig);
-  const share = (monthlyPesos: number) => {
-    const t = C(monthlyPesos);
+  const split = (t: number) => {
     if (!semi) return t;
     if (cfg.contributionTiming === "SECOND_HALF") return i.half === 2 ? t : 0;
     const first = Math.floor(t / 2);
     return i.half === 1 ? first : t - first;
   };
+  const share = (monthlyPesos: number) => split(i.noContributions ? 0 : C(monthlyPesos));
   const sssC = share(sss.ee);
   const phC = share(ph.ee);
   const hdmfC = share(hdmf.ee);
+  const contribC = sssC + phC + hdmfC;
 
-  const taxable = P(Math.max(0, taxableC - sssC - phC - hdmfC));
-  const taxC = C(withholdingTax(taxable, semi ? cfg.tax.semiMonthly : cfg.tax.monthly));
+  const method = i.tax ?? { kind: "PERIOD" };
+  /** Tax due (centavos) on taxable income t; negative only for an annualized refund. */
+  const taxOn = (t: number): number => {
+    const tp = P(Math.max(0, t));
+    switch (method.kind) {
+      case "PERIOD": return C(withholdingTax(tp, semi ? cfg.tax.semiMonthly : cfg.tax.monthly));
+      case "FLAT": return Math.round(C(tp) * method.rate);
+      case "MARGINAL": return C(withholdingTax(method.monthlyBasic + tp, cfg.tax.monthly)) - C(withholdingTax(method.monthlyBasic, cfg.tax.monthly));
+      case "ANNUALIZED": return C(annualTax(method.ytdTaxable + tp, cfg)) - C(method.ytdWithheld);
+    }
+  };
 
   const ded: PayslipLine[] = [];
-  const deduct = (code: string, label: string, c: number, ref?: string) => {
-    if (c > 0) ded.push({ kind: "deduction", code, label, amount: P(c), ...(ref ? { ref } : {}) });
+  const deduct = (code: string, label: string, c: number, extra: Partial<PayslipLine> = {}) => {
+    if (c > 0) ded.push({ kind: "deduction", code, label, amount: P(c), ...extra });
   };
+
+  // Adjustment deductions apply whole or not at all (a skipped one-off stays pending for the next run). The fit test
+  // uses the tax before pre-tax deductions, the highest it can be, so an accepted one still fits once tax drops.
+  let leftC = grossC - contribC - Math.max(0, taxOn(taxableC - contribC));
+  const benefitC = (i.benefits ?? []).map((b) => {
+    const c = i.settle ? split(C(b.monthly)) : Math.max(0, Math.min(split(C(b.monthly)), leftC));
+    leftC -= c;
+    return c;
+  });
+  const accepted = adjDeductions.filter((a) => {
+    const c = C(a.amount);
+    if (c <= 0 || (!i.settle && c > leftC)) return false;
+    leftC -= c;
+    return true;
+  });
+  const preTaxC = accepted.filter((a) => a.taxable).reduce((s, a) => s + C(a.amount), 0);
+
+  const taxDueC = taxOn(taxableC - contribC - preTaxC);
+  const taxC = Math.max(0, taxDueC);
+  if (taxDueC < 0) {
+    earn.push({ kind: "earning", code: "TAX_REFUND", label: "Tax refund (annualization)", amount: P(-taxDueC), nonTaxable: true });
+    grossC -= taxDueC;
+  }
+
   deduct("SSS", sss.eeMpf > 0 ? "SSS (incl. MPF)" : "SSS", sssC);
   deduct("PHILHEALTH", "PhilHealth", phC);
   deduct("PAGIBIG", "Pag-IBIG", hdmfC);
   deduct("TAX", "Withholding tax", taxC);
+  (i.benefits ?? []).forEach((b, k) => deduct("HMO_EE", b.label, benefitC[k]!, { ref: b.id }));
+  for (const a of accepted) deduct(a.code, a.label, C(a.amount), { ...(a.id ? { adjustmentId: a.id } : {}), ...(a.ref ? { ref: a.ref } : {}), ...(a.qty !== undefined ? { qty: a.qty } : {}), ...(a.taxable ? { preTax: true as const } : {}) });
 
-  // Loans last, capped at balance and at what is left so net pay never goes negative.
-  let leftC = grossC - sssC - phC - hdmfC - taxC;
+  // Loans last. Regular runs: amortization capped at balance and at what is left so net pay never goes negative.
+  // Final pay (settle): the full balance.
+  leftC = grossC - ded.reduce((s, l) => s + C(l.amount), 0);
   for (const l of i.loans) {
-    const c = Math.max(0, Math.min(C(l.amortization), C(l.balance), leftC));
+    const c = i.settle ? C(l.balance) : Math.max(0, Math.min(C(l.amortization), C(l.balance), leftC));
     leftC -= c;
-    deduct("LOAN", l.label, c, l.id);
+    deduct("LOAN", l.label, c, { ref: l.id });
   }
 
   const employer: PayslipLine[] = [
@@ -389,8 +496,10 @@ export function computePayslip(i: PayslipInput): PayslipResult {
   ].filter((l) => l.amount > 0) as PayslipLine[];
 
   const totalDedC = ded.reduce((s, l) => s + C(l.amount), 0);
+  const netC = grossC - totalDedC;
+  const info: PayslipLine[] = netC < 0 ? [{ kind: "info", code: "AMOUNT_DUE", label: "Amount due from employee", amount: P(-netC) }] : [];
   return {
-    lines: [...earn, ...ded, ...employer],
+    lines: [...earn, ...ded, ...employer, ...info],
     basicPay: P(basicC),
     grossPay: P(grossC),
     sss: P(sssC),
@@ -398,8 +507,205 @@ export function computePayslip(i: PayslipInput): PayslipResult {
     pagibig: P(hdmfC),
     withholdingTax: P(taxC),
     totalDeductions: P(totalDedC),
-    netPay: P(grossC - totalDedC),
+    netPay: P(Math.max(0, netC)),
+    ...(netC < 0 ? { amountDue: P(-netC) } : {}),
   };
+}
+
+/** Taxable compensation of a stored payslip: taxed earnings less contributions and pre-tax deductions (annualization input). */
+export function slipTaxableIncome(lines: PayslipLine[]): number {
+  const legacyNonTaxable = new Set(["ALLOWANCE", "REIMBURSE", "13TH", "TAX_REFUND"]);
+  let c = 0;
+  for (const l of lines) {
+    if (l.kind === "earning" && !l.nonTaxable && !legacyNonTaxable.has(l.code)) c += C(l.amount);
+    if (l.kind === "deduction" && (l.preTax || ["SSS", "PHILHEALTH", "PAGIBIG"].includes(l.code))) c -= C(l.amount);
+  }
+  return P(Math.max(0, c));
+}
+
+// ---------- Off-cycle and final pay ----------
+
+/** Off-cycle run: adjustments only (no basic, DTR, contributions or loans), taxed per config.offCycleTax. */
+export function computeOffCycle(i: { adjustments: AdjustmentInput[]; payType: "MONTHLY" | "DAILY"; basicPay: number; config: PayrollConfig }): PayslipResult {
+  const cfg = i.config;
+  return computePayslip({
+    payType: i.payType,
+    basicPay: i.basicPay,
+    allowance: 0,
+    frequency: "MONTHLY",
+    half: 2,
+    dtr: EMPTY_DTR,
+    workDays: [],
+    overtime: [],
+    loans: [],
+    expenses: [],
+    config: cfg,
+    adjustments: i.adjustments,
+    partial: true,
+    noContributions: true,
+    tax: cfg.offCycleTax.method === "FLAT" ? { kind: "FLAT", rate: cfg.offCycleTax.flatRate } : { kind: "MARGINAL", monthlyBasic: monthlyBasicOf(i.payType, i.basicPay, cfg) },
+  });
+}
+
+/** Monetized unused leave up to this many days a year is de minimis (RR 11-2018); the rest is taxable. */
+export const LEAVE_ENCASH_EXEMPT_DAYS = 10;
+
+export interface FinalPayInput extends PayslipInput {
+  /** Totals of this calendar year's finalized payslips before the final pay */
+  ytd: { basicEarned: number; thirteenthPaid: number; taxable: number; withheld: number };
+  encashDays: number;
+  /** Unreturned assets to deduct at cost */
+  assets: { id: string; label: string; amount: number }[];
+}
+
+/**
+ * Final pay (DOLE Labor Advisory 06-2020): pro-rated basic from the day after the last regular cutoff to the last day
+ * (DTR based, daily rate x paid days), approved OT, pending adjustments and reimbursements, pro-rated 13th month
+ * ((basic earned this year incl. this period) / 12 - 13th month already paid), leave encashment (days x daily rate),
+ * minus every remaining loan balance and optionally unreturned assets.
+ * Tax, "annualized-lite": annual table (monthly x 12) on YTD taxable + this payslip's taxable, minus YTD withheld;
+ * a negative result is refunded. YTD taxable comes from stored payslip lines (slipTaxableIncome), so it ignores
+ * compensation from a previous employer (BIR 2316) and non-payroll benefits.
+ * Net pay never goes negative: a shortfall is reported as AMOUNT_DUE from the employee.
+ */
+export function computeFinalPay(i: FinalPayInput): PayslipResult {
+  const cfg = i.config;
+  const base: PayslipInput = { ...i, partial: true, settle: true, tax: { kind: "ANNUALIZED", ytdTaxable: i.ytd.taxable, ytdWithheld: i.ytd.withheld } };
+  const periodBasic = computePayslip(base).basicPay;
+
+  const extra: AdjustmentInput[] = [];
+  const thirteenthC = Math.max(0, Math.round(C(i.ytd.basicEarned + periodBasic) / 12) - C(i.ytd.thirteenthPaid));
+  const exemptC = Math.min(thirteenthC, Math.max(0, C(cfg.thirteenthMonthExempt) - C(i.ytd.thirteenthPaid)));
+  extra.push({ kind: "EARNING", code: "13TH", label: "13th month pay (pro-rated)", amount: P(exemptC), taxable: false });
+  extra.push({ kind: "EARNING", code: "13TH_TAXABLE", label: "13th month (taxable excess)", amount: P(thirteenthC - exemptC), taxable: true });
+
+  const days = Math.max(0, i.encashDays);
+  const rateC = C(dailyRateOf(i.payType, i.basicPay, cfg));
+  const exemptDays = Math.min(days, LEAVE_ENCASH_EXEMPT_DAYS);
+  extra.push({ kind: "EARNING", code: "LEAVE_ENCASH", label: "Leave encashment", amount: P(Math.round(rateC * exemptDays)), taxable: false, qty: exemptDays });
+  extra.push({ kind: "EARNING", code: "LEAVE_ENCASH", label: "Leave encashment (taxable)", amount: P(Math.round(rateC * (days - exemptDays))), taxable: true, qty: Math.round((days - exemptDays) * 100) / 100 });
+
+  for (const a of i.assets) extra.push({ kind: "DEDUCTION", code: "ASSET", label: `Unreturned: ${a.label}`, amount: a.amount, taxable: false, ref: a.id });
+
+  return computePayslip({ ...base, adjustments: [...(i.adjustments ?? []), ...extra] });
+}
+
+// ---------- Salary history ----------
+
+export type CompRow = { from: string; payType: "MONTHLY" | "DAILY"; basicPay: number; allowance: number };
+
+/**
+ * Pay to use for a period when salary history has a change inside it. Each rate is weighted by the calendar days it
+ * covers in [start, end]: e.g. a raise from 30,000 to 36,000 on the 11th of a 1-15 cutoff pays
+ * (30,000 x 10 + 36,000 x 5) / 15 = 32,000 per month for that cutoff, and the daily rate, OT, absences and
+ * contributions all follow from that blended rate. A pay type change mid-period uses the latest row (ponytail).
+ * Returns null when no row applies (caller falls back to the employee record).
+ */
+export function prorateCompensation(rows: CompRow[], start: string, end: string): (Omit<CompRow, "from"> & { changed: boolean }) | null {
+  const sorted = rows.filter((r) => r.from <= end).sort((a, b) => a.from.localeCompare(b.from));
+  if (!sorted.length) return null;
+  let baseIdx = 0;
+  sorted.forEach((r, k) => {
+    if (r.from <= start) baseIdx = k;
+  });
+  const segs = sorted.slice(baseIdx).map((r, k) => ({ ...r, from: k === 0 && r.from < start ? start : r.from }));
+  const last = segs[segs.length - 1]!;
+  if (segs.length === 1 || segs.some((s) => s.payType !== last.payType)) return { payType: last.payType, basicPay: last.basicPay, allowance: last.allowance, changed: segs.length > 1 };
+  const day = (s: string) => Date.parse(`${s}T00:00:00Z`) / 86_400_000;
+  const total = day(end) - day(segs[0]!.from) + 1;
+  let basic = 0;
+  let allow = 0;
+  segs.forEach((s, k) => {
+    const days = (k + 1 < segs.length ? day(segs[k + 1]!.from) : day(end) + 1) - day(s.from);
+    basic += C(s.basicPay) * days;
+    allow += C(s.allowance) * days;
+  });
+  return { payType: last.payType, basicPay: P(Math.round(basic / total)), allowance: P(Math.round(allow / total)), changed: true };
+}
+
+// ---------- GL journal ----------
+
+export type AccountMap = {
+  salariesExpense: string;
+  employerContribExpense: string;
+  reimbursements: string;
+  sssPayable: string;
+  philhealthPayable: string;
+  pagibigPayable: string;
+  taxPayable: string;
+  loansReceivable: string;
+  employeeAdvances: string;
+  otherDeductions: string;
+  netPayPayable: string;
+  /** Department name -> cost center code (expense lines only) */
+  costCenters: Record<string, string>;
+};
+
+export const DEFAULT_ACCOUNTS: AccountMap = {
+  salariesExpense: "6100 Salaries and wages",
+  employerContribExpense: "6110 SSS, PhilHealth and Pag-IBIG (employer)",
+  reimbursements: "6300 Reimbursable expenses",
+  sssPayable: "2110 SSS payable",
+  philhealthPayable: "2120 PhilHealth payable",
+  pagibigPayable: "2130 Pag-IBIG payable",
+  taxPayable: "2140 Withholding tax payable",
+  loansReceivable: "1210 Loans receivable - employees",
+  employeeAdvances: "1220 Advances to employees",
+  otherDeductions: "2190 Other payroll deductions payable",
+  netPayPayable: "2100 Salaries payable",
+  costCenters: {},
+};
+
+export type JournalLine = { account: string; costCenter: string; memo: string; debit: number; credit: number };
+
+/** Summary journal entry for a payroll run. Debits = credits by construction (net = earnings - deductions + amount due). */
+export function buildJournal(slips: { lines: PayslipLine[]; department?: string | null }[], a: AccountMap): JournalLine[] {
+  const acc = new Map<string, JournalLine & { c: number }>();
+  const post = (side: "debit" | "credit", account: string, memo: string, c: number, costCenter = "") => {
+    if (!c) return;
+    const k = `${side}|${account}|${costCenter}|${memo}`;
+    const row = acc.get(k) ?? { account, costCenter, memo, debit: 0, credit: 0, c: 0 };
+    row.c += side === "debit" ? c : -c;
+    acc.set(k, row);
+  };
+  const cashAdvance = LOAN_TYPE_LABELS.CASH_ADVANCE;
+  for (const s of slips) {
+    const cc = (s.department && a.costCenters[s.department]) || "";
+    let netC = 0;
+    for (const l of s.lines) {
+      const c = C(l.amount);
+      if (l.kind === "earning") {
+        netC += c;
+        if (l.code === "REIMBURSE") post("debit", a.reimbursements, "Reimbursements", c, cc);
+        else if (l.code === "TAX_REFUND") post("debit", a.taxPayable, "Tax refunds", c);
+        else post("debit", a.salariesExpense, "Gross pay", c, cc);
+      } else if (l.kind === "employer") {
+        post("debit", a.employerContribExpense, "Employer contributions", c, cc);
+        const payable = l.code.startsWith("SSS") ? a.sssPayable : l.code.startsWith("PHILHEALTH") ? a.philhealthPayable : a.pagibigPayable;
+        post("credit", payable, "Employer share", c);
+      } else if (l.kind === "info") {
+        if (l.code === "AMOUNT_DUE") {
+          netC += c;
+          post("debit", a.employeeAdvances, "Due from separated employees", c);
+        }
+      } else {
+        netC -= c;
+        const [account, memo] =
+          l.code === "SSS" ? [a.sssPayable, "Employee share"]
+          : l.code === "PHILHEALTH" ? [a.philhealthPayable, "Employee share"]
+          : l.code === "PAGIBIG" ? [a.pagibigPayable, "Employee share"]
+          : l.code === "TAX" ? [a.taxPayable, "Withholding tax"]
+          : l.code === "LOAN" ? (l.label === cashAdvance ? [a.employeeAdvances, "Cash advance repayments"] : [a.loansReceivable, "Loan repayments"])
+          : [a.otherDeductions, "Other deductions"];
+        post("credit", account, memo, c);
+      }
+    }
+    post("credit", a.netPayPayable, "Net pay", netC);
+  }
+  return [...acc.values()]
+    .filter((r) => r.c !== 0)
+    .map(({ c, ...r }) => ({ ...r, debit: c > 0 ? P(c) : 0, credit: c < 0 ? P(-c) : 0 }))
+    .sort((x, y) => Number(y.debit > 0) - Number(x.debit > 0) || x.account.localeCompare(y.account) || x.costCenter.localeCompare(y.costCenter));
 }
 
 // ---------- 13th month (PD 851) ----------

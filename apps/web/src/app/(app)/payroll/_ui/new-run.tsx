@@ -12,12 +12,15 @@ type Values = { name: string; frequency: "SEMI_MONTHLY" | "MONTHLY"; periodStart
 
 export function NewRunDialog({ defaults }: { defaults: Values }) {
   const [open, setOpen] = React.useState(false);
-  const [kind, setKind] = React.useState<"REGULAR" | "THIRTEENTH_MONTH">("REGULAR");
+  const [kind, setKind] = React.useState<"REGULAR" | "THIRTEENTH_MONTH" | "OFF_CYCLE">("REGULAR");
   const year = defaults.periodStart.slice(0, 4);
+  const month = defaults.periodStart.slice(0, 7);
   const v: Values =
     kind === "REGULAR"
       ? defaults
-      : { name: `13th month pay ${year}`, frequency: defaults.frequency, periodStart: `${year}-01-01`, periodEnd: `${year}-12-31`, payDate: `${year}-12-15` };
+      : kind === "OFF_CYCLE"
+        ? { name: `Off-cycle ${defaults.name.replace(/\s*\d+-\d+,?/, "")}`, frequency: "MONTHLY", periodStart: `${month}-01`, periodEnd: defaults.periodEnd, payDate: defaults.payDate }
+        : { name: `13th month pay ${year}`, frequency: defaults.frequency, periodStart: `${year}-01-01`, periodEnd: `${year}-12-31`, payDate: `${year}-12-15` };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -32,6 +35,7 @@ export function NewRunDialog({ defaults }: { defaults: Values }) {
               <Select id="kind" name="kind" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
                 <option value="REGULAR">Regular payroll</option>
                 <option value="THIRTEENTH_MONTH">13th month pay</option>
+                <option value="OFF_CYCLE">Off-cycle (adjustments only)</option>
               </Select>
             </FormField>
             <FormField label="Frequency" name="frequency" required>
@@ -49,7 +53,7 @@ export function NewRunDialog({ defaults }: { defaults: Values }) {
             <FormField label="Period end" name="periodEnd" required>
               <Input id="periodEnd" name="periodEnd" type="date" defaultValue={v.periodEnd} />
             </FormField>
-            <FormField label="Pay date" name="payDate" required hint={kind === "REGULAR" ? undefined : "PD 851: pay on or before 24 December"}>
+            <FormField label="Pay date" name="payDate" required hint={kind === "THIRTEENTH_MONTH" ? "PD 851: pay on or before 24 December" : kind === "OFF_CYCLE" ? "Pays one-off adjustments effective in the period" : undefined}>
               <Input id="payDate" name="payDate" type="date" defaultValue={v.payDate} />
             </FormField>
           </div>

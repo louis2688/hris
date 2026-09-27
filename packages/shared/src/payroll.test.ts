@@ -11,7 +11,17 @@ import {
   philhealthContribution,
   sssContribution,
   withholdingTax,
+  buildJournal,
+  computeFinalPay,
+  computeOffCycle,
+  DEFAULT_ACCOUNTS,
+  parseAdjustmentCsv,
+  parseDependents,
+  prorateCompensation,
+  slipTaxableIncome,
+  EMPTY_DTR,
   type PayslipInput,
+  type PayslipResult,
 } from "./schemas/payroll";
 
 const dtr = (o: Partial<DtrRangeTotals> = {}): DtrRangeTotals => ({
@@ -188,6 +198,8 @@ describe("settings form", () => {
     const flat: Record<string, unknown> = { daysPerYear: "261", hoursPerDay: "8", contributionTiming: "SPLIT", thirteenthMonthExempt: "90000" };
     for (const g of ["sss", "philhealth", "pagibig", "premiums", "schedule"] as const)
       for (const [k, v] of Object.entries(cfg[g])) flat[`${g}.${k}`] = typeof v === "number" && (g === "premiums" || ["eeRate", "erRate", "rate", "eeShare", "eeRateLow"].includes(k)) ? String(v * 100) : String(v);
+    flat["offCycleTax.method"] = cfg.offCycleTax.method;
+    flat["offCycleTax.flatRate"] = String(cfg.offCycleTax.flatRate * 100);
     flat["tax.monthly"] = JSON.stringify(cfg.tax.monthly);
     flat["tax.semiMonthly"] = JSON.stringify(cfg.tax.semiMonthly);
     const r = payrollConfigSchema.safeParse(unflattenPayrollForm(flat));
@@ -195,5 +207,167 @@ describe("settings form", () => {
     expect(r.data).toEqual(cfg);
     flat["tax.monthly"] = "[{bad json";
     expect(payrollConfigSchema.safeParse(unflattenPayrollForm(flat)).success).toBe(false);
+  });
+});
+
+const cents = (n: number) => Math.round(n * 100);
+const sumC = (r: PayslipResult, kind: string) => r.lines.filter((l) => l.kind === kind).reduce((a, l) => a + cents(l.amount), 0);
+
+describe("adjustments", () => {
+  const bonus = (taxable: boolean) => ({ id: "adj1", kind: "EARNING" as const, code: "BONUS", label: "Bonus", amount: 5000, taxable });
+  it("taxable earnings raise gross and tax; non-taxable ones only gross", () => {
+    const base = computePayslip(input({}));
+    const taxed = computePayslip(input({ adjustments: [bonus(true)] }));
+    const free = computePayslip(input({ adjustments: [bonus(false)] }));
+    expect(taxed.grossPay).toBe(base.grossPay + 5000);
+    expect(free.grossPay).toBe(base.grossPay + 5000);
+    expect(free.withholdingTax).toBe(base.withholdingTax);
+    expect(taxed.withholdingTax).toBe(withholdingTax(15000 - base.sss - base.philhealth - base.pagibig + 5000, cfg.tax.semiMonthly));
+    expect(line(taxed, "BONUS")).toMatchObject({ amount: 5000, adjustmentId: "adj1" });
+    expect(line(free, "BONUS")).toMatchObject({ nonTaxable: true });
+  });
+  it("pre-tax deductions lower the tax; a deduction that does not fit is skipped whole", () => {
+    const base = computePayslip(input({}));
+    const pre = computePayslip(input({ adjustments: [{ id: "d1", kind: "DEDUCTION", code: "SALARY_DEDUCTION", label: "Overpayment", amount: 1000, taxable: true }] }));
+    expect(pre.withholdingTax).toBeLessThan(base.withholdingTax);
+    expect(line(pre, "SALARY_DEDUCTION")).toMatchObject({ amount: 1000, preTax: true, adjustmentId: "d1" });
+    const post = computePayslip(input({ adjustments: [{ kind: "DEDUCTION", code: "OTHER_DEDUCTION", label: "Uniform", amount: 1000, taxable: false }] }));
+    expect(post.withholdingTax).toBe(base.withholdingTax);
+    expect(post.netPay).toBe(Math.round((base.netPay - 1000) * 100) / 100);
+    const huge = computePayslip(input({ adjustments: [{ id: "d2", kind: "DEDUCTION", code: "OTHER_DEDUCTION", label: "Too big", amount: 99999, taxable: false }] }));
+    expect(line(huge, "OTHER_DEDUCTION")).toBeUndefined();
+    expect(huge.netPay).toBe(base.netPay);
+  });
+  it("HMO employee share splits per cutoff like contributions", () => {
+    const b = [{ id: "e1", label: "HMO (Maxicare)", monthly: 1000.01 }];
+    const h1 = line(computePayslip(input({ half: 1, benefits: b })), "HMO_EE")!.amount;
+    const h2 = line(computePayslip(input({ half: 2, benefits: b })), "HMO_EE")!.amount;
+    expect(cents(h1) + cents(h2)).toBe(100001);
+    expect(line(computePayslip(input({ frequency: "MONTHLY", benefits: b })), "HMO_EE")!.amount).toBe(1000.01);
+  });
+  it("stored lines give back the taxable income the tax was computed on", () => {
+    const r = computePayslip(input({ allowance: 2000, adjustments: [bonus(true), bonus(false), { kind: "DEDUCTION", code: "SALARY_DEDUCTION", label: "x", amount: 500, taxable: true }] }));
+    expect(withholdingTax(slipTaxableIncome(r.lines), cfg.tax.semiMonthly)).toBe(r.withholdingTax);
+  });
+});
+
+describe("off-cycle run", () => {
+  const adj = [
+    { id: "a", kind: "EARNING" as const, code: "BONUS", label: "Performance bonus", amount: 10000, taxable: true },
+    { id: "b", kind: "EARNING" as const, code: "INCENTIVE", label: "Gift", amount: 1000, taxable: false },
+  ];
+  it("adjustments only; TABLE taxes at the marginal monthly bracket over basic", () => {
+    const r = computeOffCycle({ adjustments: adj, payType: "MONTHLY", basicPay: 30000, config: cfg });
+    expect(r.lines.map((l) => l.code).sort()).toEqual(["BONUS", "INCENTIVE", "TAX"]);
+    expect(r.basicPay).toBe(0);
+    expect(r.sss + r.philhealth + r.pagibig).toBe(0);
+    expect(r.withholdingTax).toBe(1833.35); // tax(40,000) 3,208.40 - tax(30,000) 1,375.05
+    expect(r.netPay).toBe(11000 - 1833.35);
+  });
+  it("FLAT withholds the configured rate on the taxable amount", () => {
+    const r = computeOffCycle({ adjustments: adj, payType: "MONTHLY", basicPay: 30000, config: { ...cfg, offCycleTax: { method: "FLAT", flatRate: 0.2 } } });
+    expect(r.withholdingTax).toBe(2000);
+  });
+});
+
+describe("salary history", () => {
+  const rows = [
+    { from: "2024-01-01", payType: "MONTHLY" as const, basicPay: 30000, allowance: 1000 },
+    { from: "2026-10-11", payType: "MONTHLY" as const, basicPay: 36000, allowance: 1000 },
+  ];
+  it("pro-rates a mid-cutoff raise by calendar days", () => {
+    expect(prorateCompensation(rows, "2026-10-01", "2026-10-15")).toEqual({ payType: "MONTHLY", basicPay: 32000, allowance: 1000, changed: true });
+    expect(prorateCompensation(rows, "2026-09-16", "2026-09-30")).toMatchObject({ basicPay: 30000, changed: false });
+    expect(prorateCompensation(rows, "2026-10-16", "2026-10-31")).toMatchObject({ basicPay: 36000, changed: false });
+    expect(prorateCompensation(rows, "2023-01-01", "2023-01-15")).toBeNull();
+    // the blended rate flows into basic pay
+    expect(computePayslip(input({ basicPay: 32000 })).basicPay).toBe(16000);
+  });
+  it("a pay type change mid-period uses the latest row", () => {
+    const r = prorateCompensation([rows[0]!, { from: "2026-10-11", payType: "DAILY", basicPay: 1500, allowance: 0 }], "2026-10-01", "2026-10-15");
+    expect(r).toMatchObject({ payType: "DAILY", basicPay: 1500 });
+  });
+});
+
+describe("final pay", () => {
+  const fp = (o: Partial<Parameters<typeof computeFinalPay>[0]> = {}) =>
+    computeFinalPay({
+      ...input({ dtr: dtr({ workDays: 5, present: 5 }) }),
+      ytd: { basicEarned: 240000, thirteenthPaid: 0, taxable: 200000, withheld: 20000 },
+      encashDays: 5,
+      assets: [],
+      ...o,
+    });
+  const daily = Math.round((30000 * 12 * 100) / 261) / 100; // 1,379.31
+  it("pro-rated basic, 13th month and leave encashment", () => {
+    const r = fp();
+    expect(line(r, "BASIC")).toMatchObject({ amount: Math.round(daily * 5 * 100) / 100, qty: 5 });
+    expect(line(r, "13TH")!.amount).toBe(Math.round(((240000 + r.basicPay) / 12) * 100) / 100);
+    expect(line(r, "LEAVE_ENCASH")).toMatchObject({ amount: Math.round(daily * 5 * 100) / 100, nonTaxable: true, qty: 5 });
+    expect(cents(r.grossPay) - cents(r.totalDeductions)).toBe(cents(r.netPay));
+  });
+  it("13th already paid is subtracted; encashment above 10 days is taxable", () => {
+    const r = fp({ ytd: { basicEarned: 240000, thirteenthPaid: 20000, taxable: 200000, withheld: 20000 }, encashDays: 12.5 });
+    expect(line(r, "13TH")!.amount).toBe(Math.round(((240000 + r.basicPay) / 12 - 20000) * 100) / 100);
+    const enc = r.lines.filter((l) => l.code === "LEAVE_ENCASH");
+    expect(enc.map((l) => l.qty)).toEqual([10, 2.5]);
+    expect(enc[1]!.nonTaxable).toBeUndefined();
+  });
+  it("annualized tax: over-withheld YTD is refunded", () => {
+    const r = fp({ ytd: { basicEarned: 240000, thirteenthPaid: 0, taxable: 200000, withheld: 50000 } });
+    expect(r.withholdingTax).toBe(0);
+    expect(line(r, "TAX_REFUND")!.amount).toBeGreaterThan(0);
+  });
+  it("loans are netted at full balance; net never goes negative, the shortfall is due from the employee", () => {
+    const r = fp({ loans: [{ id: "L1", label: "Company loan", amortization: 1000, balance: 80000 }], assets: [{ id: "A1", label: "Laptop", amount: 45000 }] });
+    expect(line(r, "LOAN")!.amount).toBe(80000);
+    expect(line(r, "ASSET")).toMatchObject({ amount: 45000, label: "Unreturned: Laptop" });
+    expect(r.netPay).toBe(0);
+    expect(r.amountDue).toBe((cents(r.totalDeductions) - cents(r.grossPay)) / 100);
+    expect(line(r, "AMOUNT_DUE")).toMatchObject({ kind: "info", amount: r.amountDue });
+  });
+  it("empty period after the last full cutoff pays no basic or contributions", () => {
+    const r = fp({ dtr: EMPTY_DTR, noContributions: true });
+    expect(r.basicPay).toBe(0);
+    expect(r.sss + r.philhealth + r.pagibig).toBe(0);
+    expect(line(r, "13TH")!.amount).toBe(20000);
+  });
+});
+
+describe("GL journal", () => {
+  it("debits equal credits across mixed payslips, with cost centers on expense lines", () => {
+    const slips = [
+      computePayslip(input({ allowance: 2000, loans: [{ id: "L", label: "Cash advance", amortization: 500, balance: 2000 }], expenses: [{ id: "X", label: "Taxi", amount: 350.5 }], benefits: [{ id: "B", label: "HMO", monthly: 800 }] })),
+      computePayslip(input({ payType: "DAILY", basicPay: 695, adjustments: [{ kind: "EARNING", code: "BONUS", label: "Bonus", amount: 1234.56, taxable: true }] })),
+      computeFinalPay({ ...input({ dtr: dtr({ workDays: 3 }) }), ytd: { basicEarned: 100000, thirteenthPaid: 0, taxable: 90000, withheld: 30000 }, encashDays: 3, assets: [{ id: "A", label: "Phone", amount: 30000 }], loans: [{ id: "L2", label: "Company loan", amortization: 1, balance: 60000 }] }),
+    ].map((r, k) => ({ lines: r.lines, department: k === 0 ? "Engineering" : "Sales" }));
+    const j = buildJournal(slips, { ...DEFAULT_ACCOUNTS, costCenters: { Engineering: "CC-ENG" } });
+    const dr = j.reduce((a, l) => a + cents(l.debit), 0);
+    const cr = j.reduce((a, l) => a + cents(l.credit), 0);
+    expect(dr).toBe(cr);
+    expect(j.find((l) => l.costCenter === "CC-ENG" && l.account === DEFAULT_ACCOUNTS.salariesExpense)).toBeTruthy();
+    expect(j.find((l) => l.account === DEFAULT_ACCOUNTS.employeeAdvances && l.debit > 0)).toBeTruthy(); // amount due
+    expect(j.find((l) => l.account === DEFAULT_ACCOUNTS.reimbursements)!.debit).toBe(350.5);
+  });
+});
+
+describe("adjustment CSV import", () => {
+  it("parses quotes, fills defaults from the code preset and reports bad rows", () => {
+    const csv = 'employeeCode,kind,code,label,amount,taxable,effectiveDate\r\nEMP-0001,,bonus,"Q3 bonus, sales",\"1,500.50\",,2026-10-01\nEMP-0002,DEDUCTION,OTHER_DEDUCTION,,200,no,2026-10-01\nEMP-0003,EARNING,BONUS,x,-5,yes,2026-13-01\n';
+    const r = parseAdjustmentCsv(csv);
+    expect(r.rows).toEqual([
+      { employeeCode: "EMP-0001", kind: "EARNING", code: "BONUS", label: "Q3 bonus, sales", amount: 1500.5, taxable: true, effectiveDate: "2026-10-01" },
+      { employeeCode: "EMP-0002", kind: "DEDUCTION", code: "OTHER_DEDUCTION", label: "Other deduction", amount: 200, taxable: false, effectiveDate: "2026-10-01" },
+    ]);
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0]).toMatch(/^Row 4: amount/);
+    expect(parseAdjustmentCsv("code,amount\n").errors[0]).toMatch(/Missing columns: employeeCode, effectiveDate/);
+  });
+  it("dependents lines", () => {
+    expect(parseDependents("Ana Cruz | Spouse | 1990-02-03\n\nLeo | Child").dependents).toEqual([
+      { name: "Ana Cruz", relationship: "Spouse", birthDate: "1990-02-03" },
+      { name: "Leo", relationship: "Child", birthDate: null },
+    ]);
+    expect(parseDependents("Ana").error).toMatch(/Line 1/);
   });
 });

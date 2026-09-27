@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Pencil } from "lucide-react";
+import Link from "next/link";
+import { History, Pencil } from "lucide-react";
+import { maskAccount } from "@hris/shared";
 import { saveCompensationAction } from "@/server/actions/payroll";
 import { ActionForm, FormField } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
@@ -22,11 +24,14 @@ type Row = {
   sssNo: string | null;
   philhealthNo: string | null;
   pagibigNo: string | null;
+  bankName: string | null;
+  bankAccountNo: string | null;
+  upcoming: { date: string; basicPay: number } | null;
 };
 
 const php = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
 
-export function CompensationTable({ rows }: { rows: Row[] }) {
+export function CompensationTable({ rows, today }: { rows: Row[]; today: string }) {
   const [q, setQ] = React.useState("");
   const [editing, setEditing] = React.useState<Row | null>(null);
   const needle = q.trim().toLowerCase();
@@ -37,7 +42,7 @@ export function CompensationTable({ rows }: { rows: Row[] }) {
       <div className="border-b border-slate-100 px-5 py-4">
         <Input type="search" placeholder="Search name, code or department" value={q} onChange={(e) => setQ(e.target.value)} className="sm:max-w-xs" aria-label="Search employees" />
       </div>
-      <Table className="min-w-[980px]">
+      <Table className="min-w-[1080px]">
         <THead>
           <tr>
             <TH>Employee</TH>
@@ -48,7 +53,8 @@ export function CompensationTable({ rows }: { rows: Row[] }) {
             <TH>SSS</TH>
             <TH>PhilHealth</TH>
             <TH>Pag-IBIG</TH>
-            <TH className="w-12" />
+            <TH>Bank</TH>
+            <TH className="w-20" />
           </tr>
         </THead>
         <TBody>
@@ -64,13 +70,21 @@ export function CompensationTable({ rows }: { rows: Row[] }) {
               <TD>{r.payType === "DAILY" ? "Daily" : "Monthly"}</TD>
               <TD className="whitespace-nowrap text-right tabular-nums">
                 {r.basicPay == null ? <Badge tone="amber">Not set</Badge> : `${php.format(r.basicPay)}${r.payType === "DAILY" ? " /day" : ""}`}
+                {r.upcoming ? <span className="block text-xs text-tone-blue-fg">{php.format(r.upcoming.basicPay)} from {r.upcoming.date}</span> : null}
               </TD>
               <TD className="text-right tabular-nums">{r.allowance ? php.format(r.allowance) : "-"}</TD>
               <TD className="whitespace-nowrap font-mono text-xs">{r.tin ?? "-"}</TD>
               <TD className="whitespace-nowrap font-mono text-xs">{r.sssNo ?? "-"}</TD>
               <TD className="whitespace-nowrap font-mono text-xs">{r.philhealthNo ?? "-"}</TD>
               <TD className="whitespace-nowrap font-mono text-xs">{r.pagibigNo ?? "-"}</TD>
-              <TD className="text-right">
+              <TD className="whitespace-nowrap text-xs">
+                {r.bankName ?? "-"}
+                {r.bankAccountNo ? <span className="block font-mono text-slate-500">{maskAccount(r.bankAccountNo)}</span> : null}
+              </TD>
+              <TD className="whitespace-nowrap text-right">
+                <Link href={`/payroll/compensation/${r.id}`} className="inline-flex size-8 items-center justify-center rounded-full text-ink hover:bg-ink/5" aria-label={`Salary history for ${r.name}`}>
+                  <History className="size-4" />
+                </Link>
                 <Button variant="ghost" size="icon-sm" onClick={() => setEditing(r)} aria-label={`Edit compensation for ${r.name}`}>
                   <Pencil />
                 </Button>
@@ -86,6 +100,12 @@ export function CompensationTable({ rows }: { rows: Row[] }) {
           {editing ? (
             <ActionForm key={editing.id} action={saveCompensationAction.bind(null, editing.id)} onSuccess={() => setEditing(null)}>
               <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="Effective from" name="effectiveFrom" required hint="Pay changes apply from this date; earlier cutoffs keep the old pay.">
+                  <Input id="effectiveFrom" name="effectiveFrom" type="date" defaultValue={today} />
+                </FormField>
+                <FormField label="Reason" name="reason" hint="e.g. Annual increase, Promotion">
+                  <Input id="reason" name="reason" maxLength={200} />
+                </FormField>
                 <FormField label="Pay type" name="payType" required>
                   <Select id="payType" name="payType" defaultValue={editing.payType}>
                     <option value="MONTHLY">Monthly salary</option>
@@ -109,6 +129,12 @@ export function CompensationTable({ rows }: { rows: Row[] }) {
                 </FormField>
                 <FormField label="Pag-IBIG MID no." name="pagibigNo">
                   <Input id="pagibigNo" name="pagibigNo" placeholder="0000-0000-0000" defaultValue={editing.pagibigNo ?? ""} />
+                </FormField>
+                <FormField label="Bank" name="bankName">
+                  <Input id="bankName" name="bankName" placeholder="BDO, BPI, Metrobank..." defaultValue={editing.bankName ?? ""} />
+                </FormField>
+                <FormField label="Account no." name="bankAccountNo">
+                  <Input id="bankAccountNo" name="bankAccountNo" inputMode="numeric" autoComplete="off" defaultValue={editing.bankAccountNo ?? ""} />
                 </FormField>
               </div>
             </ActionForm>

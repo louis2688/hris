@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { companySettingsSchema, compensationSchema, createPayrollRunSchema, payrollConfigSchema, unflattenPayrollForm } from "@hris/shared";
+import { accountMapSchema, adjustmentSchema, companySettingsSchema, compensationSchema, createPayrollRunSchema, payrollConfigSchema, unflattenPayrollForm } from "@hris/shared";
 import { requireRole } from "../auth/session";
 import * as payroll from "../services/payroll";
 import { formToObject, parse, run, type ActionResult } from "./_helpers";
@@ -58,8 +58,9 @@ export async function saveCompensationAction(employeeId: string | undefined, _p:
   if (!employeeId) return { ok: false, error: "Pick an employee" };
   const p = parse(compensationSchema, formToObject(fd));
   if ("error" in p) return p.error;
-  const r = await run(() => payroll.updateCompensation(actor, employeeId, p.data), "Compensation saved");
+  const r = await run(() => payroll.updateCompensation(actor, employeeId, p.data), p.data.effectiveFrom && p.data.effectiveFrom > payroll.today() ? `Saved. The new pay applies on ${p.data.effectiveFrom}.` : "Compensation saved");
   revalidatePath("/payroll/compensation");
+  revalidatePath(`/payroll/compensation/${employeeId}`);
   return r;
 }
 
@@ -95,5 +96,48 @@ export async function resetPayrollConfigAction(): Promise<ActionResult> {
   const actor = await staff();
   const r = await run(() => payroll.savePayrollConfig(actor, null), "Rates reset to defaults");
   revalidatePath("/settings/payroll");
+  return r;
+}
+
+// ---------- Adjustments ----------
+
+export async function createAdjustmentAction(_p: ActionResult | undefined, fd: FormData): Promise<ActionResult> {
+  const actor = await staff();
+  const p = parse(adjustmentSchema, formToObject(fd));
+  if ("error" in p) return p.error;
+  const r = await run(async () => void (await payroll.createAdjustment(actor, p.data)), "Adjustment added");
+  revalidatePath("/payroll/adjustments");
+  return r;
+}
+
+export async function importAdjustmentsAction(_p: ActionResult | undefined, fd: FormData): Promise<ActionResult> {
+  const actor = await staff();
+  const file = fd.get("file");
+  const text = file instanceof File && file.size ? (file.size > 1_000_000 ? null : await file.text()) : String(fd.get("csv") ?? "");
+  if (text === null) return { ok: false, error: "File is larger than 1 MB" };
+  if (!text.trim()) return { ok: false, error: "Choose a CSV file or paste rows" };
+  const r = await run(() => payroll.importAdjustments(actor, text));
+  revalidatePath("/payroll/adjustments");
+  return r.ok ? { ok: true, data: undefined, message: `${r.data} adjustment${r.data === 1 ? "" : "s"} imported` } : r;
+}
+
+export async function deleteAdjustmentAction(id: string): Promise<ActionResult> {
+  const actor = await staff();
+  const r = await run(() => payroll.deleteAdjustment(actor, id), "Adjustment deleted");
+  revalidatePath("/payroll/adjustments");
+  return r;
+}
+
+// ---------- Accounting ----------
+
+export async function saveAccountingAction(_p: ActionResult | undefined, fd: FormData): Promise<ActionResult> {
+  const actor = await staff();
+  const o = formToObject(fd);
+  const costCenters: Record<string, string> = {};
+  for (const [k, v] of Object.entries(o)) if (k.startsWith("cc:")) costCenters[k.slice(3)] = String(v);
+  const p = parse(accountMapSchema, { ...o, costCenters });
+  if ("error" in p) return p.error;
+  const r = await run(() => payroll.saveAccounting(actor, p.data), "Account map saved");
+  revalidatePath("/settings/accounting");
   return r;
 }

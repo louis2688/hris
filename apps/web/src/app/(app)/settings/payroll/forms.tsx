@@ -148,6 +148,15 @@ export function RatesForm({ config }: { config: PayrollConfig }) {
               <FormField label="13th month + benefits tax exemption (PHP)" name="thirteenthMonthExempt" className="sm:col-span-2" hint="NIRC sec. 32(B)(7)(e), TRAIN: P90,000">
                 <Input id="thirteenthMonthExempt" name="thirteenthMonthExempt" type="number" step="0.01" min={0} defaultValue={config.thirteenthMonthExempt} />
               </FormField>
+              <FormField label="Off-cycle withholding" name="offCycleTax.method" className="sm:col-span-2" hint="Table: taxed at the employee's own bracket on top of monthly basic. Flat: taxable amount x rate.">
+                <Select id="offCycleTax.method" name="offCycleTax.method" defaultValue={config.offCycleTax.method}>
+                  <option value="TABLE">Monthly table, marginal over basic</option>
+                  <option value="FLAT">Flat rate</option>
+                </Select>
+              </FormField>
+              <FormField label="Off-cycle flat rate (%)" name="offCycleTax.flatRate">
+                <Input id="offCycleTax.flatRate" name="offCycleTax.flatRate" type="number" step="any" min={0} max={100} defaultValue={shown(config.offCycleTax.flatRate, true)} />
+              </FormField>
             </div>
           </fieldset>
 

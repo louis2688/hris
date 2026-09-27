@@ -103,6 +103,13 @@ export default async function PayslipPage({ params }: { params: Promise<{ id: st
           <Lines title="Deductions" lines={slip.lines.filter((l) => l.kind === "deduction")} total={Number(slip.totalDeductions)} totalLabel="Total deductions" />
         </div>
 
+        {slip.lines
+          .filter((l) => l.code === "AMOUNT_DUE")
+          .map((l) => (
+            <p key="due" className="mb-3 rounded-xl bg-tone-red-bg px-5 py-3 text-sm font-medium text-tone-red-fg">
+              Deductions exceed final pay. Amount due from employee: <span className="tabular-nums">{peso(l.amount)}</span>
+            </p>
+          ))}
         <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl bg-bone px-5 py-4 print:bg-transparent print:px-0">
           <p className="text-sm font-medium text-slate-700">Net pay</p>
           <p className="font-display text-3xl font-bold tracking-[-0.02em] tabular-nums text-ink">{peso(slip.netPay)}</p>

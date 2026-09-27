@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, HeartPulse } from "lucide-react";
 import { requireSession } from "@/server/auth/session";
 import { listMyPayslips } from "@/server/services/payroll";
+import { myBenefits } from "@/server/services/benefits";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/card";
 import { fmtDate } from "@/lib/utils";
 import { kindLabel, periodLabel, peso } from "../payroll/_ui/format";
@@ -11,7 +12,7 @@ export const metadata: Metadata = { title: "Payslips" };
 
 export default async function PayslipsPage() {
   const user = await requireSession();
-  const slips = user.employeeId ? await listMyPayslips(user.employeeId) : [];
+  const [slips, benefits] = user.employeeId ? await Promise.all([listMyPayslips(user.employeeId), myBenefits(user.employeeId)]) : [[], []];
   const latest = slips[0];
 
   return (
@@ -24,6 +25,34 @@ export default async function PayslipsPage() {
           <Link href={`/payslips/${latest.id}`} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-on-dark underline-offset-4 hover:underline">
             View payslip <ChevronRight className="size-4" />
           </Link>
+        </Card>
+      ) : null}
+      {benefits.length ? (
+        <Card className="mb-6">
+          <CardHeader title="Your benefits" description="Your share is deducted from each payslip, split per cutoff." />
+          <ul className="divide-y divide-slate-100">
+            {benefits.map((b) => (
+              <li key={b.id} className="flex items-start justify-between gap-4 px-5 py-3.5">
+                <div className="flex min-w-0 gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-bone text-ink">
+                    <HeartPulse className="size-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink">{b.plan}</p>
+                    <p className="text-xs text-slate-500">
+                      {b.provider}
+                      {b.cardNo ? ` · Card ${b.cardNo}` : ""}
+                      {b.dependents.length ? ` · Dependents: ${b.dependents.map((d) => d.name).join(", ")}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <p className="shrink-0 text-right text-sm tabular-nums text-ink">
+                  {peso(b.monthlyEe)}
+                  <span className="block text-xs text-slate-500">your share / month</span>
+                </p>
+              </li>
+            ))}
+          </ul>
         </Card>
       ) : null}
       <Card>

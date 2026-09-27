@@ -28,12 +28,15 @@ export default async function PayrollRunPage({ params }: { params: Promise<{ id:
     return {
       ...s,
       extra: sum((l) => l.kind === "earning" && !["BASIC", "ABSENT", "TARDY", "ALLOWANCE", "REIMBURSE"].includes(l.code)),
+      due: sum((l) => l.code === "AMOUNT_DUE"),
       er: { sss: sum((l) => l.code === "SSS_ER" || l.code === "SSS_EC"), ph: sum((l) => l.code === "PHILHEALTH_ER"), hdmf: sum((l) => l.code === "PAGIBIG_ER") },
     };
   });
   const total = (f: (s: (typeof slips)[number]) => unknown) => slips.reduce((a, s) => a + cents(Number(f(s))), 0) / 100;
   const draft = run.status === "DRAFT";
   const has = slips.length > 0;
+  const finalPay = run.kind === "FINAL_PAY";
+  const separationId = run.separations[0]?.id;
 
   return (
     <>
@@ -51,9 +54,17 @@ export default async function PayrollRunPage({ params }: { params: Promise<{ id:
                 <ConfirmButton action={deleteRunAction.bind(null, run.id)} confirm="Delete this draft run and its payslips?" variant="ghost" className="text-red-700">
                   Delete draft
                 </ConfirmButton>
-                <ConfirmButton action={computeRunAction.bind(null, run.id)} confirm={has ? "Recompute replaces every payslip in this run. Continue?" : "Compute payslips for all active employees with basic pay?"} variant={has ? "secondary" : "brand"}>
-                  {has ? "Recompute" : "Compute payslips"}
-                </ConfirmButton>
+                {finalPay ? (
+                  separationId ? (
+                    <Link href={`/separations/${separationId}`} className={buttonVariants({ variant: "secondary" })}>
+                      Edit on separation
+                    </Link>
+                  ) : null
+                ) : (
+                  <ConfirmButton action={computeRunAction.bind(null, run.id)} confirm={has ? "Recompute replaces every payslip in this run. Continue?" : "Compute payslips for all active employees with basic pay?"} variant={has ? "secondary" : "brand"}>
+                    {has ? "Recompute" : "Compute payslips"}
+                  </ConfirmButton>
+                )}
                 {has ? (
                   <ConfirmButton action={finalizeRunAction.bind(null, run.id)} confirm="Finalize? Payslips are locked, loan payments are posted and employees are notified." variant="brand">
                     Finalize
@@ -109,9 +120,17 @@ export default async function PayrollRunPage({ params }: { params: Promise<{ id:
             <CardHeader
               title="Payslips"
               action={
-                <div className="flex gap-2 print:hidden">
-                  <a href={`/payroll/${run.id}/export?type=register`} className={buttonVariants({ variant: "secondary" })}>
-                    <Download /> Payroll register
+                <div className="flex flex-wrap gap-2 print:hidden">
+                  <a href={`/payroll/${run.id}/export?type=register`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                    <Download /> Register
+                  </a>
+                  {draft ? null : (
+                    <a href={`/payroll/${run.id}/export?type=bank`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                      <Download /> Bank file CSV
+                    </a>
+                  )}
+                  <a href={`/payroll/${run.id}/export?type=gl`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                    <Download /> GL journal CSV
                   </a>
                   <PrintButton label="Print" />
                 </div>
@@ -122,7 +141,7 @@ export default async function PayrollRunPage({ params }: { params: Promise<{ id:
                 <tr>
                   <TH>Employee</TH>
                   <TH className="text-right">Basic</TH>
-                  <TH className="text-right">OT &amp; premiums</TH>
+                  <TH className="text-right">OT, premiums &amp; other</TH>
                   <TH className="text-right">Gross</TH>
                   <TH className="text-right">Deductions</TH>
                   <TH className="text-right">Net pay</TH>
@@ -143,7 +162,10 @@ export default async function PayrollRunPage({ params }: { params: Promise<{ id:
                     <TD className="text-right tabular-nums">{s.extra ? peso(s.extra) : "-"}</TD>
                     <TD className="text-right tabular-nums">{peso(s.grossPay)}</TD>
                     <TD className="text-right tabular-nums">{peso(s.totalDeductions)}</TD>
-                    <TD className="text-right font-semibold tabular-nums text-ink">{peso(s.netPay)}</TD>
+                    <TD className="text-right font-semibold tabular-nums text-ink">
+                      {peso(s.netPay)}
+                      {s.due ? <span className="block text-xs font-medium text-tone-red-fg">Due from employee {peso(s.due)}</span> : null}
+                    </TD>
                   </TR>
                 ))}
                 <tr className="bg-bone font-semibold text-ink">
@@ -162,7 +184,12 @@ export default async function PayrollRunPage({ params }: { params: Promise<{ id:
         <Card>
           <EmptyState
             title={draft ? "No payslips yet" : "This run has no payslips"}
-            description={draft ? "Compute to pull attendance, approved overtime, loans and expense claims for every active employee with basic pay." : undefined}
+            description={
+              !draft ? undefined
+              : finalPay ? "Compute final pay from the separation page."
+              : run.kind === "OFF_CYCLE" ? "Compute to pay one-off adjustments (bonuses, incentives) effective in this period. No basic pay, attendance or contributions."
+              : "Compute to pull attendance, approved overtime, loans, expense claims, adjustments and HMO shares for every active employee with basic pay."
+            }
           />
         </Card>
       )}
