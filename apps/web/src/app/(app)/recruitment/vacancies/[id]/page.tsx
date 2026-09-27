@@ -36,8 +36,17 @@ export default async function VacancyPage({ params, searchParams }: { params: Pr
       </p>
       <PageHeader
         title={v.title}
-        description={[v.department?.name, v.location?.name, v.hiringManager ? `Hiring manager ${fullName(v.hiringManager)}` : null, `${v.positions} position${v.positions > 1 ? "s" : ""}`].filter(Boolean).join(" · ")}
-        actions={<Badge tone={v.status === "OPEN" ? "green" : "slate"}>{v.status.toLowerCase()}</Badge>}
+        description={[v.department?.name, v.location?.name, v.hiringManager ? `Hiring manager ${fullName(v.hiringManager)}` : null, `${v.positions} position${v.positions > 1 ? "s" : ""}`, v.closesAt ? `closes ${fmtDate(v.closesAt)}` : null, v.referralBonus && Number(v.referralBonus) > 0 ? `referral bonus PHP ${Number(v.referralBonus).toLocaleString("en-PH")}` : null].filter(Boolean).join(" · ")}
+        actions={
+          <>
+            {v.isPublic && v.slug ? (
+              <a href={`/careers/${v.slug}`} target="_blank" rel="noreferrer" className="text-sm font-medium text-brand-700 hover:underline">
+                View public listing
+              </a>
+            ) : null}
+            <Badge tone={v.status === "OPEN" ? "green" : "slate"}>{v.status.toLowerCase()}</Badge>
+          </>
+        }
       />
       {v.description ? <p className="mb-6 max-w-3xl whitespace-pre-line text-sm text-slate-600">{v.description}</p> : null}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

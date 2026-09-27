@@ -1,7 +1,11 @@
 import "server-only";
 import { prisma, type Prisma } from "@hris/db";
-import { createEmployeeSchema, type CandidateInput, type CandidateStage, type InterviewInput, type SessionUser, type VacancyInput } from "@hris/shared";
+import { DEFAULT_CRITERIA, createEmployeeSchema, slugify, type CandidateInput, type CandidateStage, type FeedbackInput, type InterviewInput, type SessionUser, type VacancyInput } from "@hris/shared";
+import { AuthError } from "../auth/session";
+import { isStaff } from "../authz";
 import { audit, notify } from "./audit";
+import { uniqueSlug } from "./careers";
+import { getJson, setJson } from "./settings";
 import { createEmployee } from "./employees";
 import { AppError, conflict, notFound } from "./errors";
 
@@ -37,7 +41,16 @@ export async function getVacancy(id: string) {
 }
 
 export async function saveVacancy(actor: SessionUser, d: VacancyInput, id?: string) {
-  const data = { title: d.title, jobTitleId: d.jobTitleId ?? null, departmentId: d.departmentId ?? null, locationId: d.locationId ?? null, hiringManagerId: d.hiringManagerId ?? null, positions: d.positions, description: d.description ?? null, status: d.status };
+  // Keep an existing slug when the field is left blank so shared links don't break; mint one from the title when going public.
+  let slug = id ? ((await prisma.vacancy.findUnique({ where: { id }, select: { slug: true } }))?.slug ?? null) : null;
+  if (d.slug) {
+    slug = slugify(d.slug);
+    if ((await uniqueSlug(slug, id)) !== slug) throw new AppError("That URL slug is already used by another vacancy");
+  } else if (!slug && d.isPublic) slug = await uniqueSlug(slugify(d.title), id);
+  const data = {
+    title: d.title, jobTitleId: d.jobTitleId ?? null, departmentId: d.departmentId ?? null, locationId: d.locationId ?? null, hiringManagerId: d.hiringManagerId ?? null, positions: d.positions, description: d.description ?? null, status: d.status,
+    isPublic: d.isPublic, slug, closesAt: d.closesAt ? new Date(`${d.closesAt}T00:00:00Z`) : null, referralBonus: d.referralBonus ?? null,
+  };
   const row = id ? await prisma.vacancy.update({ where: { id }, data }) : await prisma.vacancy.create({ data });
   await audit(actor.id, id ? "vacancy.update" : "vacancy.create", "Vacancy", row.id, { after: row });
   return row;
@@ -66,8 +79,9 @@ export async function getCandidate(id: string) {
     where: { id },
     include: {
       vacancy: { select: { id: true, title: true, jobTitleId: true, departmentId: true, locationId: true, hiringManagerId: true } },
-      interviews: { orderBy: { scheduledAt: "asc" }, include: { interviewer: person } },
+      interviews: { orderBy: [{ round: "asc" }, { scheduledAt: "asc" }], include: { interviewer: person, feedback: { orderBy: { createdAt: "asc" }, include: { interviewer: person } } } },
       hiredEmployee: { select: { id: true, employeeCode: true } },
+      referrer: { select: { id: true, employeeCode: true, firstName: true, lastName: true, preferredName: true } },
     },
   });
   if (!c) throw notFound("Candidate");
@@ -77,7 +91,7 @@ export async function getCandidate(id: string) {
 export type CandidateDetail = Awaited<ReturnType<typeof getCandidate>>;
 
 export async function saveCandidate(actor: SessionUser, d: CandidateInput, id?: string) {
-  const data = { firstName: d.firstName, lastName: d.lastName, email: d.email, phone: d.phone ?? null, vacancyId: d.vacancyId ?? null, source: d.source ?? null, resumeUrl: d.resumeUrl ?? null, notes: d.notes ?? null };
+  const data = { firstName: d.firstName, lastName: d.lastName, email: d.email, phone: d.phone ?? null, vacancyId: d.vacancyId ?? null, source: d.source ?? null, resumeUrl: d.resumeUrl ?? null, notes: d.notes ?? null, referrerId: d.referrerId ?? null };
   if (!id && d.vacancyId && (await prisma.candidate.findFirst({ where: { email: d.email, vacancyId: d.vacancyId } }))) throw conflict("This candidate already applied to that vacancy");
   const row = id ? await prisma.candidate.update({ where: { id }, data }) : await prisma.candidate.create({ data });
   await audit(actor.id, id ? "candidate.update" : "candidate.create", "Candidate", row.id, { after: { stage: row.stage, vacancyId: row.vacancyId } });
@@ -108,7 +122,7 @@ export async function addInterview(actor: SessionUser, candidateId: string, d: I
   if (!c) throw notFound("Candidate");
   if (c.stage === "HIRED" || c.stage === "REJECTED" || c.stage === "WITHDRAWN") throw new AppError(`Candidate is ${c.stage.toLowerCase()}`);
   const row = await prisma.$transaction(async (tx) => {
-    const i = await tx.interview.create({ data: { candidateId, title: d.title, scheduledAt: new Date(d.scheduledAt), interviewerId: d.interviewerId ?? null, location: d.location ?? null, notes: d.notes ?? null } });
+    const i = await tx.interview.create({ data: { candidateId, title: d.title, scheduledAt: new Date(d.scheduledAt), interviewerId: d.interviewerId ?? null, round: d.round, location: d.location ?? null, notes: d.notes ?? null } });
     if (c.stage === "APPLIED" || c.stage === "SHORTLISTED") await tx.candidate.update({ where: { id: candidateId }, data: { stage: "INTERVIEW" } });
     return i;
   });
@@ -170,3 +184,34 @@ export const upcomingInterviews = (employeeId?: string | null) =>
     take: 10,
     include: { candidate: { select: { id: true, firstName: true, lastName: true, vacancy: { select: { title: true } } } } },
   });
+
+// ---------- scorecards ----------
+
+export const getCriteria = async () => (await getJson("recruitment", { criteria: DEFAULT_CRITERIA })).criteria;
+
+export async function setCriteria(actor: SessionUser, criteria: string[]) {
+  const cur = await getJson<Record<string, unknown>>("recruitment", {});
+  await setJson("recruitment", { ...cur, criteria });
+  await audit(actor.id, "settings.recruitment_criteria", "AppSetting", "recruitment", { after: { criteria } });
+}
+
+/** Staff, or an employee who interviews this candidate. Everyone else gets 404 so ids don't leak. */
+export async function canViewCandidate(u: SessionUser, candidateId: string) {
+  if (isStaff(u)) return true;
+  if (!u.employeeId) return false;
+  return !!(await prisma.interview.findFirst({ where: { candidateId, interviewerId: u.employeeId }, select: { id: true } }));
+}
+
+/** One scorecard per interviewer per interview; resubmitting replaces it. */
+export async function submitFeedback(actor: SessionUser, interviewId: string, d: FeedbackInput) {
+  const i = await prisma.interview.findUnique({ where: { id: interviewId }, select: { candidateId: true, interviewerId: true, title: true } });
+  if (!i) throw notFound("Interview");
+  if (!actor.employeeId) throw new AppError("Only users with an employee record can submit scorecards");
+  if (!isStaff(actor) && i.interviewerId !== actor.employeeId) throw new AuthError("Forbidden", 403);
+  const criteria = await getCriteria();
+  const scores = Object.fromEntries(Object.entries(d.scores).filter(([k]) => criteria.includes(k)));
+  const data = { scores, rating: d.rating, recommendation: d.recommendation, comments: d.comments ?? null };
+  await prisma.interviewFeedback.upsert({ where: { interviewId_interviewerId: { interviewId, interviewerId: actor.employeeId } }, create: { interviewId, interviewerId: actor.employeeId, ...data }, update: data });
+  await audit(actor.id, "candidate.scorecard", "Candidate", i.candidateId, { after: { interview: i.title, rating: d.rating, recommendation: d.recommendation } });
+  return i.candidateId;
+}

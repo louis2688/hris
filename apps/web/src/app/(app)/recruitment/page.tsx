@@ -4,7 +4,7 @@ import { CANDIDATE_STAGES, CANDIDATE_STAGE_LABELS, type CandidateStage } from "@
 import { gate } from "@/server/auth/session";
 import { employeeOptions } from "@/server/services/employees";
 import { listDepartments, listJobTitles, listLocations } from "@/server/services/org";
-import { listCandidates, listVacancies, upcomingInterviews } from "@/server/services/recruitment";
+import { getCriteria, listCandidates, listVacancies, upcomingInterviews } from "@/server/services/recruitment";
 import { deleteVacancyAction, saveVacancyAction } from "@/server/actions/recruitment";
 import { EntityManager } from "@/components/entity-manager";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { StageBadge } from "@/components/stage-badge";
 import { cn, fmtDate, fmtDateTime, fullName, toSearchParams } from "@/lib/utils";
 import { NewCandidate } from "./new-candidate";
+import { CriteriaCard } from "./criteria";
 
 export const metadata: Metadata = { title: "Recruitment" };
 
@@ -21,7 +22,7 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
   const sp = await searchParams;
   const tab = sp.tab === "vacancies" ? "vacancies" : "candidates";
   const stage = (CANDIDATE_STAGES as readonly string[]).includes(sp.stage ?? "") ? (sp.stage as CandidateStage) : undefined;
-  const [vacancies, candidates, jobTitles, departments, locations, people, interviews] = await Promise.all([
+  const [vacancies, candidates, jobTitles, departments, locations, people, interviews, criteria] = await Promise.all([
     listVacancies(),
     listCandidates({ stage, vacancyId: sp.vacancyId, q: sp.q }),
     listJobTitles(),
@@ -29,13 +30,15 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
     listLocations(),
     employeeOptions(),
     upcomingInterviews(),
+    getCriteria(),
   ]);
+  const peopleOpts = people.map((p) => ({ id: p.id, name: `${fullName(p)} (${p.employeeCode})` }));
   const opts = (xs: { id: string; name: string }[]) => xs.map((x) => ({ id: x.id, name: x.name }));
   const openVacancies = vacancies.filter((v) => v.status === "OPEN").map((v) => ({ id: v.id, name: v.title }));
 
   return (
     <>
-      <PageHeader title="Recruitment" description={`${openVacancies.length} open vacancies · ${Object.values(candidates.stages).reduce((a, b) => a + (b ?? 0), 0)} candidates`} actions={<NewCandidate vacancies={openVacancies} />} />
+      <PageHeader title="Recruitment" description={`${openVacancies.length} open vacancies · ${Object.values(candidates.stages).reduce((a, b) => a + (b ?? 0), 0)} candidates`} actions={<NewCandidate vacancies={openVacancies} people={peopleOpts} />} />
       <nav className="mb-6 inline-flex gap-1 rounded-full bg-slate-100 p-1">
         {(["candidates", "vacancies"] as const).map((t) => (
           <Link key={t} href={`/recruitment?tab=${t}`} className={cn("rounded-full px-3.5 py-1.5 text-sm font-medium capitalize", tab === t ? "bg-card text-ink shadow-card" : "text-slate-600 hover:text-ink")}>
@@ -52,16 +55,30 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
           rows={vacancies.map((v) => ({
             id: v.id,
             cells: [
-              <Link key="t" href={`/recruitment/vacancies/${v.id}`} className="hover:text-brand-700">
-                {v.title}
-                <span className="block text-xs font-normal text-slate-500">{v.positions} position{v.positions > 1 ? "s" : ""}</span>
-              </Link>,
+              <div key="t">
+                <Link href={`/recruitment/vacancies/${v.id}`} className="hover:text-brand-700">
+                  {v.title}
+                </Link>
+                <span className="block text-xs font-normal text-slate-500">
+                  {v.positions} position{v.positions > 1 ? "s" : ""}
+                  {v.isPublic && v.slug ? (
+                    <>
+                      {" · "}
+                      <a href={`/careers/${v.slug}`} target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">
+                        public listing
+                      </a>
+                    </>
+                  ) : null}
+                  {v.referralBonus && Number(v.referralBonus) > 0 ? ` · referral PHP ${Number(v.referralBonus).toLocaleString("en-PH")}` : ""}
+                </span>
+              </div>,
               v.department?.name ?? "-",
               v.hiringManager ? fullName(v.hiringManager) : "-",
               `${v.total} total · ${v.byStage.INTERVIEW ?? 0} interviewing · ${v.byStage.HIRED ?? 0} hired`,
               <Badge key="s" tone={v.status === "OPEN" ? "green" : v.status === "DRAFT" ? "amber" : "slate"}>{v.status.toLowerCase()}</Badge>,
             ],
-            values: v,
+            // Decimal isn't serializable to the client form; send a plain string.
+            values: { ...v, referralBonus: v.referralBonus?.toString() ?? null },
           }))}
           fields={[
             { name: "title", label: "Title", required: true, span: 2 },
@@ -72,6 +89,10 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
             { name: "positions", label: "Positions", type: "number", min: 1 },
             { name: "status", label: "Status", type: "select", options: [{ id: "OPEN", name: "Open" }, { id: "DRAFT", name: "Draft" }, { id: "CLOSED", name: "Closed" }], placeholder: "Open" },
             { name: "description", label: "Description", type: "textarea", span: 2 },
+            { name: "isPublic", label: "List on the public careers page", type: "checkbox", span: 2 },
+            { name: "slug", label: "URL slug", placeholder: "auto from title", hint: "careers/<slug>. Letters, numbers, dashes." },
+            { name: "closesAt", label: "Applications close", type: "date", hint: "Leave blank to keep open" },
+            { name: "referralBonus", label: "Referral bonus (PHP)", type: "number", min: 0, step: "0.01", hint: "Paid to the referrer after 90 days" },
           ]}
           saveAction={saveVacancyAction}
           deleteAction={deleteVacancyAction}
@@ -130,6 +151,7 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
               )}
             </Card>
           </div>
+          <div className="space-y-6">
           <Card className="h-fit">
             <CardHeader title="Upcoming interviews" />
             {interviews.length === 0 ? (
@@ -151,6 +173,8 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
               </ul>
             )}
           </Card>
+          <CriteriaCard criteria={criteria} />
+          </div>
         </div>
       )}
     </>

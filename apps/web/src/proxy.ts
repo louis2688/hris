@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifyToken } from "@/server/auth/jwt";
 
-const PUBLIC = ["/login", "/api/auth", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/health", "/iclock"];
+const PUBLIC = ["/login", "/api/auth", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/health", "/iclock", "/careers", "/offer"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;

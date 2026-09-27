@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Select, Textarea } from "@/components/ui/input";
 
-export type CandidateInitial = { firstName: string; lastName: string; email: string; phone: string | null; vacancyId: string | null; source: string | null; resumeUrl: string | null; notes: string | null };
+export type CandidateInitial = { firstName: string; lastName: string; email: string; phone: string | null; vacancyId: string | null; source: string | null; resumeUrl: string | null; notes: string | null; referrerId?: string | null };
+type Opt = { id: string; name: string };
 
-export function CandidateForm({ id, initial, vacancies, onDone }: { id?: string; initial?: CandidateInitial; vacancies: { id: string; name: string }[]; onDone: (id: string) => void }) {
+export function CandidateForm({ id, initial, vacancies, people = [], onDone }: { id?: string; initial?: CandidateInitial; vacancies: Opt[]; people?: Opt[]; onDone: (id: string) => void }) {
   return (
     <ActionForm action={saveCandidateAction.bind(null, id)} onSuccess={(d: { id: string }) => onDone(d.id)} submitLabel={id ? "Save" : "Add candidate"}>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -45,7 +46,17 @@ export function CandidateForm({ id, initial, vacancies, onDone }: { id?: string;
             ))}
           </datalist>
         </FormField>
-        <FormField label="Resume link" name="resumeUrl" hint="Google Drive / Dropbox link" className="sm:col-span-2">
+        <FormField label="Referred by" name="referrerId" hint="Earns the vacancy's referral bonus after 90 days">
+          <Select id="referrerId" name="referrerId" defaultValue={initial?.referrerId ?? ""}>
+            <option value="">No referrer</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Resume link" name="resumeUrl" hint="Google Drive / Dropbox link">
           <Input id="resumeUrl" name="resumeUrl" type="url" defaultValue={initial?.resumeUrl ?? ""} />
         </FormField>
         <FormField label="Notes" name="notes" className="sm:col-span-2">
@@ -56,7 +67,7 @@ export function CandidateForm({ id, initial, vacancies, onDone }: { id?: string;
   );
 }
 
-export function NewCandidate({ vacancies }: { vacancies: { id: string; name: string }[] }) {
+export function NewCandidate({ vacancies, people }: { vacancies: Opt[]; people?: Opt[] }) {
   const [open, setOpen] = React.useState(false);
   const router = useRouter();
   return (
@@ -66,7 +77,7 @@ export function NewCandidate({ vacancies }: { vacancies: { id: string; name: str
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent title="Add candidate">
-          <CandidateForm vacancies={vacancies} onDone={(id) => router.push(`/recruitment/candidates/${id}`)} />
+          <CandidateForm vacancies={vacancies} people={people} onDone={(id) => router.push(`/recruitment/candidates/${id}`)} />
         </DialogContent>
       </Dialog>
     </>
