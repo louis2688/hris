@@ -1,5 +1,6 @@
 // Owned by the payroll feature. Zod schemas and constants go here.
 import { z } from "zod";
+import { isPayrollPercentField, ADJUSTMENT_PRESETS, type AdjustmentPreset, ADJUSTMENT_CSV_COLUMNS, SEPARATION_REASONS, EXIT_QUESTIONS } from "../constants";
 
 export * from "../payroll";
 
@@ -105,10 +106,6 @@ export const payrollConfigSchema = z.object({
   offCycleTax: z.object({ method: z.enum(["TABLE", "FLAT"]), flatRate: rate }),
 });
 
-/** Rate fields the settings form shows as percentages (5 = 5%); premiums are all percentages (125 = 125%). */
-export const PAYROLL_PERCENT_FIELDS = new Set(["sss.eeRate", "sss.erRate", "philhealth.rate", "philhealth.eeShare", "pagibig.eeRateLow", "pagibig.eeRate", "pagibig.erRate", "offCycleTax.flatRate"]);
-export const isPayrollPercentField = (k: string) => k.startsWith("premiums.") || PAYROLL_PERCENT_FIELDS.has(k);
-
 /** Flat form fields ("sss.eeRate" in %, "tax.monthly" as JSON text) -> nested object for payrollConfigSchema. */
 export function unflattenPayrollForm(flat: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, Record<string, unknown> | unknown> = {};
@@ -133,9 +130,6 @@ export function unflattenPayrollForm(flat: Record<string, unknown>): Record<stri
   return out;
 }
 
-/** "1234 5678 9012" -> "**** 9012" for lists. */
-export const maskAccount = (no: string | null | undefined) => (no ? `**** ${no.replace(/[^0-9]/g, "").slice(-4)}` : null);
-
 const checkbox = z.preprocess((v) => v === true || v === "on" || v === "true", z.boolean());
 const optDate = z.union([z.literal(""), isoDate]).optional().transform((v) => (v ? v : null));
 const pesosAmount = z.coerce
@@ -146,18 +140,6 @@ const pesosAmount = z.coerce
 
 // ---------- Adjustments ----------
 
-/** Presets in the "Add adjustment" dialog. taxable: an earning is taxed; a deduction is taken before tax. */
-export const ADJUSTMENT_PRESETS = {
-  BONUS: { label: "Bonus", kind: "EARNING", taxable: true },
-  INCENTIVE: { label: "Incentive", kind: "EARNING", taxable: true },
-  RETENTION_BONUS: { label: "Retention bonus", kind: "EARNING", taxable: true },
-  ARREARS: { label: "Salary arrears", kind: "EARNING", taxable: true },
-  COMMISSION: { label: "Commission", kind: "EARNING", taxable: true },
-  OTHER_EARNING: { label: "Other earning", kind: "EARNING", taxable: true },
-  SALARY_DEDUCTION: { label: "Salary deduction", kind: "DEDUCTION", taxable: true },
-  OTHER_DEDUCTION: { label: "Other deduction", kind: "DEDUCTION", taxable: false },
-} as const satisfies Record<string, { label: string; kind: "EARNING" | "DEDUCTION"; taxable: boolean }>;
-export type AdjustmentPreset = keyof typeof ADJUSTMENT_PRESETS;
 /** Codes other features write (leave encashment, referral bonus) plus the presets. */
 export const ADJUSTMENT_CODE_LABELS: Record<string, string> = {
   ...Object.fromEntries(Object.entries(ADJUSTMENT_PRESETS).map(([k, v]) => [k, v.label])),
@@ -220,7 +202,6 @@ export function parseCsvText(text: string): string[][] {
   return rows;
 }
 
-export const ADJUSTMENT_CSV_COLUMNS = ["employeeCode", "kind", "code", "label", "amount", "taxable", "effectiveDate"] as const;
 export type AdjustmentCsvRow = { employeeCode: string; kind: "EARNING" | "DEDUCTION"; code: string; label: string; amount: number; taxable: boolean; effectiveDate: string };
 
 /** Bulk import: every row must be valid or nothing is imported. Blank kind/label/taxable default from the code preset. */
@@ -255,8 +236,6 @@ export function parseAdjustmentCsv(text: string): { rows: AdjustmentCsvRow[]; er
 
 // ---------- Separations ----------
 
-export const SEPARATION_REASONS = ["RESIGNATION", "TERMINATION", "END_OF_CONTRACT", "RETIREMENT", "OTHER"] as const;
-export const SEPARATION_REASON_LABELS = { RESIGNATION: "Resignation", TERMINATION: "Termination", END_OF_CONTRACT: "End of contract", RETIREMENT: "Retirement", OTHER: "Other" } as const;
 export const SEPARATION_STATUS_LABELS = { CLEARANCE: "Clearance", FINAL_PAY: "Final pay", COMPLETED: "Completed", CANCELLED: "Cancelled" } as const;
 /** Employee status once the separation completes. */
 export const separationStatusFor = (reason: (typeof SEPARATION_REASONS)[number]) => (reason === "TERMINATION" || reason === "END_OF_CONTRACT" ? "TERMINATED" : "RESIGNED");
@@ -273,12 +252,6 @@ export const startSeparationSchema = z
   })
   .refine((d) => !d.noticeDate || d.noticeDate <= d.lastDay, { path: ["lastDay"], message: "Last day must be on or after the notice date" });
 
-export const EXIT_QUESTIONS = {
-  reason: "Main reason for leaving",
-  didWell: "What did we do well?",
-  improve: "What should we improve?",
-  recommend: "Would you recommend us as a place to work?",
-} as const;
 export const exitInterviewSchema = z.object({
   reason: z.string().trim().min(1, "Required").max(2000),
   didWell: z.string().trim().max(2000).default(""),

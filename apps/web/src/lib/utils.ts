@@ -1,8 +1,22 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { format } from "date-fns";
 
 export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
+
+const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const pad = (n: number) => String(n).padStart(2, "0");
+/**
+ * date-fns `format` subset (local time): EEEE EEE MMMM MMM yyyy dd d HH mm. Unknown letters throw, like date-fns.
+ * ponytail: hand-rolled because lib/utils ships to every page (cn) and date-fns format + locale cost ~13 KB gz there; use date-fns again if patterns grow.
+ */
+function format(d: Date, pattern: string) {
+  const t: Record<string, string> = { EEEE: DAY[d.getDay()]!, EEE: DAY[d.getDay()]!.slice(0, 3), MMMM: MON[d.getMonth()]!, MMM: MON[d.getMonth()]!.slice(0, 3), yyyy: String(d.getFullYear()), dd: pad(d.getDate()), d: String(d.getDate()), HH: pad(d.getHours()), mm: pad(d.getMinutes()) };
+  return pattern.replace(/EEEE|EEE|MMMM|MMM|yyyy|dd|d|HH|mm|[A-Za-z]/g, (k) => {
+    if (!(k in t)) throw new RangeError(`Unsupported date token "${k}" in "${pattern}"`);
+    return t[k]!;
+  });
+}
 
 /** Dates from Prisma @db.Date are UTC midnight; format them in UTC to avoid off-by-one. */
 export function fmtDate(d: Date | string | null | undefined, pattern = "d MMM yyyy"): string {

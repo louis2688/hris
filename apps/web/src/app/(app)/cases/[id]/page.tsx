@@ -38,8 +38,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default async function CasePage({ params }: { params: Promise<{ id: string }> }) {
   const user = await gate("ADMIN", "HR");
   const { id } = await params;
-  const c = await getCase(user, id).catch(() => notFound());
-  const docs = await listForCase(id);
+  // Docs load alongside the case; they only render once getCase has passed.
+  const [c, docs] = await Promise.all([getCase(user, id).catch(() => notFound()), listForCase(id)]);
   const minDue = new Date(manilaToday().getTime() + NTE_MIN_DAYS * 86_400_000).toISOString().slice(0, 10);
   const overdue = c.status === "NTE_ISSUED" && !!c.nteDueAt && c.nteDueAt < new Date();
   const decided = c.status === "DECISION" || c.status === "CLOSED";

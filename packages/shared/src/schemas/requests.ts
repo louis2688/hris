@@ -1,14 +1,12 @@
 // Owned by the requests feature. Zod schemas and constants go here.
 import { z } from "zod";
+import { EXPENSE_CATEGORIES, LOAN_TYPES, otMinutes } from "../constants";
 
 /** Overtime can be filed up to this many days after the fact. */
 export const OT_MAX_AGE_DAYS = 30;
 
 export const REQUEST_STATUS_LABELS = { PENDING: "Pending", APPROVED: "Approved", REJECTED: "Rejected", CANCELLED: "Cancelled" } as const;
-export const EXPENSE_CATEGORIES = ["Transportation", "Meals", "Supplies", "Communication", "Training", "Other"] as const;
-export const LOAN_TYPE_LABELS = { CASH_ADVANCE: "Cash advance", COMPANY_LOAN: "Company loan", SSS_LOAN: "SSS salary loan", PAGIBIG_LOAN: "Pag-IBIG salary loan" } as const;
 export const LOAN_STATUS_LABELS = { PENDING: "Pending", ACTIVE: "Active", PAID: "Paid", REJECTED: "Rejected", CANCELLED: "Cancelled" } as const;
-export const LOAN_TYPES = ["CASH_ADVANCE", "COMPANY_LOAN", "SSS_LOAN", "PAGIBIG_LOAN"] as const;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date").refine((v) => !Number.isNaN(Date.parse(v)), "Invalid date");
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:mm");
@@ -22,20 +20,6 @@ const peso = (label: string) =>
     .transform((v) => v.replace(/,/g, ""))
     .pipe(z.string().regex(/^\d{1,10}(\.\d{1,2})?$/, `${label} must be a number with up to 2 decimals`))
     .refine((v) => Number(v) > 0, `${label} must be more than 0`);
-
-const hm = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
-
-/** [start, end) in minutes from 00:00 of the OT date; end > 1440 when it crosses midnight. */
-export function otRange(start: string, end: string): [number, number] {
-  const s = hm(start);
-  let e = hm(end);
-  if (e <= s) e += 1440;
-  return [s, e];
-}
-export const otMinutes = (start: string, end: string) => {
-  const [s, e] = otRange(start, end);
-  return e - s;
-};
 
 export const overtimeSchema = z
   .object({ date: isoDate, startTime: hhmm, endTime: hhmm, reason: text(500, "Say what the overtime was for") })

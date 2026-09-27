@@ -1,5 +1,6 @@
 // Lifecycle: employment events, grievance/disciplinary cases, custom fields, document ack/expiry.
 import { z } from "zod";
+import { EVENT_STATUS_OPTIONS, CASE_TYPES, SANCTIONS, SANCTION_LABELS, cfName } from "../constants";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date");
 const optId = z
@@ -30,8 +31,6 @@ export const EMPLOYMENT_EVENT_LABELS: Record<EmploymentEventType, string> = {
 };
 /** Types HR records from the "Record change" dialog. SALARY_CHANGE / SEPARATION come from payroll. */
 export const RECORDABLE_EVENT_TYPES = ["PROMOTION", "TRANSFER", "STATUS_CHANGE"] as const;
-/** Status changes via "Record change"; separations go through the separation flow. */
-export const EVENT_STATUS_OPTIONS = ["PROBATION", "ACTIVE", "ON_LEAVE", "SUSPENDED"] as const;
 
 export const recordChangeSchema = z
   .object({
@@ -58,8 +57,6 @@ export type RecordChangeInput = z.infer<typeof recordChangeSchema>;
 
 // ---------- Cases (PH twin-notice due process) ----------
 
-export const CASE_TYPES = ["GRIEVANCE", "INCIDENT", "DISCIPLINARY"] as const;
-export const CASE_TYPE_LABELS: Record<(typeof CASE_TYPES)[number], string> = { GRIEVANCE: "Grievance", INCIDENT: "Incident", DISCIPLINARY: "Disciplinary" };
 export const CASE_STATUSES = ["OPEN", "NTE_ISSUED", "EXPLANATION_RECEIVED", "HEARING", "DECISION", "CLOSED"] as const;
 export type CaseStatus = (typeof CASE_STATUSES)[number];
 export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
@@ -69,14 +66,6 @@ export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   HEARING: "Hearing",
   DECISION: "Decision",
   CLOSED: "Closed",
-};
-export const SANCTIONS = ["NONE", "VERBAL_WARNING", "WRITTEN_WARNING", "SUSPENSION", "TERMINATION"] as const;
-export const SANCTION_LABELS: Record<(typeof SANCTIONS)[number], string> = {
-  NONE: "None",
-  VERBAL_WARNING: "Verbal warning",
-  WRITTEN_WARNING: "Written warning",
-  SUSPENSION: "Suspension",
-  TERMINATION: "Termination",
 };
 /** Labor Code / DOLE: the employee gets at least 5 calendar days to explain. */
 export const NTE_MIN_DAYS = 5;
@@ -172,9 +161,6 @@ export function customFieldValueSchema(def: CustomFieldDefLike): z.ZodType<Custo
       return need(z.union([z.undefined(), z.string().trim().max(2000).transform((v) => (v ? v : undefined))]));
   }
 }
-
-/** Form field name for a custom field. */
-export const cfName = (key: string) => `cf_${key}`;
 
 /** Build the object schema for all given defs, reading `cf_<key>` inputs. */
 export function customFieldsSchema(defs: CustomFieldDefLike[]) {

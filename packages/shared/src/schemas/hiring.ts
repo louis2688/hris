@@ -1,28 +1,9 @@
 // Owned by the hiring feature: job offers, scorecards, careers page, referrals.
 import { z } from "zod";
-import { EMPLOYMENT_TYPES } from "../constants";
+import { EMPLOYMENT_TYPES, RECOMMENDATIONS, type Recommendation } from "../constants";
 
 const opt = (max = 200) => z.string().trim().max(max).optional().or(z.literal("")).transform((v) => (v ? v : undefined));
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date");
-
-export const OFFER_STATUSES = ["DRAFT", "SENT", "ACCEPTED", "DECLINED", "WITHDRAWN", "EXPIRED"] as const;
-export type OfferStatus = (typeof OFFER_STATUSES)[number];
-export const OFFER_STATUS_TONE: Record<OfferStatus, "slate" | "blue" | "green" | "red" | "amber"> = {
-  DRAFT: "slate",
-  SENT: "blue",
-  ACCEPTED: "green",
-  DECLINED: "red",
-  WITHDRAWN: "slate",
-  EXPIRED: "amber",
-};
-
-export const DEFAULT_OFFER_TERMS = [
-  { label: "Probationary period", value: "6 months" },
-  { label: "Work schedule", value: "Monday to Friday, 9:00 AM - 6:00 PM" },
-  { label: "HMO", value: "Covered from day one, plus 1 free dependent upon regularization" },
-  { label: "13th month pay", value: "As mandated by PD 851" },
-  { label: "Leave credits", value: "15 vacation and 15 sick leave days per year" },
-];
 
 const term = z.object({ label: z.string().trim().min(1).max(80), value: z.string().trim().min(1).max(300) });
 export type OfferTerm = z.infer<typeof term>;
@@ -64,10 +45,6 @@ export const namesMatch = (typed: string, expected: string) => {
 
 // ---------- scorecards ----------
 
-export const RECOMMENDATIONS = ["STRONG_YES", "YES", "NO", "STRONG_NO"] as const;
-export type Recommendation = (typeof RECOMMENDATIONS)[number];
-export const RECOMMENDATION_LABELS: Record<Recommendation, string> = { STRONG_YES: "Strong yes", YES: "Yes", NO: "No", STRONG_NO: "Strong no" };
-export const RECOMMENDATION_TONE: Record<Recommendation, "green" | "blue" | "amber" | "red"> = { STRONG_YES: "green", YES: "blue", NO: "amber", STRONG_NO: "red" };
 export const DEFAULT_CRITERIA = ["Communication", "Technical skills", "Problem solving", "Culture add", "Role fit"];
 
 const score = z.coerce.number().int().min(1, "Score 1 to 5").max(5, "Score 1 to 5");

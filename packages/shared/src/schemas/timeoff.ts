@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CORRECTION_KINDS } from "../constants";
 import { correctionNeeds } from "../timeoff";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
@@ -7,14 +8,6 @@ const optTime = hhmm.optional().or(z.literal("")).transform((v) => (v ? v : unde
 const opt = (max = 300) => z.string().trim().max(max).optional().or(z.literal("")).transform((v) => (v ? v : undefined));
 const reason = z.string().trim().min(3, "Give a short reason").max(500);
 
-export const CORRECTION_KINDS = ["MISSED_IN", "MISSED_OUT", "MISSED_BOTH", "WORK_FROM_HOME", "OFFICIAL_BUSINESS"] as const;
-export const CORRECTION_KIND_LABELS: Record<(typeof CORRECTION_KINDS)[number], string> = {
-  MISSED_IN: "Missed time in",
-  MISSED_OUT: "Missed time out",
-  MISSED_BOTH: "Missed in and out",
-  WORK_FROM_HOME: "Work from home",
-  OFFICIAL_BUSINESS: "Official business",
-};
 /** Corrections can be filed for yesterday back to this many days. */
 export const CORRECTION_MAX_DAYS_BACK = 30;
 /** Comp-off can be claimed for rest days / holidays worked within this many days. */

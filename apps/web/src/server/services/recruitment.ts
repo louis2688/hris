@@ -1,10 +1,11 @@
 import "server-only";
+import { revalidateTag } from "next/cache";
 import { prisma, type Prisma } from "@hris/db";
 import { DEFAULT_CRITERIA, createEmployeeSchema, slugify, type CandidateInput, type CandidateStage, type FeedbackInput, type InterviewInput, type SessionUser, type VacancyInput } from "@hris/shared";
 import { AuthError } from "../auth/session";
 import { isStaff } from "../authz";
 import { audit, notify } from "./audit";
-import { uniqueSlug } from "./careers";
+import { uniqueSlug, VACANCIES_TAG } from "./careers";
 import { getJson, setJson } from "./settings";
 import { createEmployee } from "./employees";
 import { AppError, conflict, notFound } from "./errors";
@@ -53,11 +54,13 @@ export async function saveVacancy(actor: SessionUser, d: VacancyInput, id?: stri
   };
   const row = id ? await prisma.vacancy.update({ where: { id }, data }) : await prisma.vacancy.create({ data });
   await audit(actor.id, id ? "vacancy.update" : "vacancy.create", "Vacancy", row.id, { after: row });
+  revalidateTag(VACANCIES_TAG, { expire: 0 });
   return row;
 }
 
 export async function deleteVacancy(actor: SessionUser, id: string) {
   await prisma.vacancy.delete({ where: { id } });
+  revalidateTag(VACANCIES_TAG, { expire: 0 });
   await audit(actor.id, "vacancy.delete", "Vacancy", id);
 }
 
@@ -172,7 +175,10 @@ export async function hireCandidate(actor: SessionUser, id: string, d: { employe
   if (c.vacancy) {
     const hired = await prisma.candidate.count({ where: { vacancyId: c.vacancy.id, stage: "HIRED" } });
     const v = await prisma.vacancy.findUnique({ where: { id: c.vacancy.id }, select: { positions: true } });
-    if (v && hired >= v.positions) await prisma.vacancy.update({ where: { id: c.vacancy.id }, data: { status: "CLOSED" } });
+    if (v && hired >= v.positions) {
+      await prisma.vacancy.update({ where: { id: c.vacancy.id }, data: { status: "CLOSED" } });
+      revalidateTag(VACANCIES_TAG, { expire: 0 });
+    }
   }
   return { employeeId: employee.id, initialPassword };
 }

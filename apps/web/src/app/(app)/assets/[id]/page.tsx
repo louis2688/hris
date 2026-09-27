@@ -28,9 +28,8 @@ const ACTION_LABEL: Record<string, string> = {
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
   await gate("ADMIN", "HR");
   const { id } = await params;
-  const a = await getAsset(id).catch(() => null);
+  const [a, history, employees, categories] = await Promise.all([getAsset(id).catch(() => null), assetHistory(id), employeeOptions(), assetCategories()]);
   if (!a) notFound();
-  const [history, employees, categories] = await Promise.all([assetHistory(id), employeeOptions(), assetCategories()]);
   const peso = a.cost ? `PHP ${Number(a.cost).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` : null;
 
   async function remove() {

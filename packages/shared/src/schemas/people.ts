@@ -1,13 +1,7 @@
 // Owned by the people feature (announcements, checklists, org chart, assets). Zod schemas and constants go here.
 import { z } from "zod";
+import { CHECKLIST_KINDS, TASK_OWNERS, ASSET_STATUSES } from "../constants";
 
-export const CHECKLIST_KINDS = ["ONBOARDING", "OFFBOARDING"] as const;
-export const CHECKLIST_KIND_LABELS = { ONBOARDING: "Onboarding", OFFBOARDING: "Offboarding" } as const;
-export const TASK_OWNERS = ["HR", "MANAGER", "EMPLOYEE", "IT"] as const;
-export const TASK_OWNER_LABELS = { HR: "HR", MANAGER: "Manager", EMPLOYEE: "Employee", IT: "IT" } as const;
-export const ASSET_STATUSES = ["AVAILABLE", "ASSIGNED", "REPAIR", "RETIRED"] as const;
-export const ASSET_STATUS_LABELS = { AVAILABLE: "Available", ASSIGNED: "Assigned", REPAIR: "In repair", RETIRED: "Retired" } as const;
-export const ASSET_CATEGORIES = ["Laptop", "Desktop", "Monitor", "Phone", "Tablet", "Peripheral", "Furniture", "Other"] as const;
 /** Title of the offboarding item every new OFFBOARDING template starts with. */
 export const RETURN_ASSETS_TASK = "Return company assets";
 

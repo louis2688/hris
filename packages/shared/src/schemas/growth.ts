@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GOAL_STATUSES, TRAINING_STATUSES, QUESTION_TYPES } from "../constants";
 
 // ---------- helpers ----------
 
@@ -13,10 +14,6 @@ const arr = <T extends z.ZodType>(s: T) => z.preprocess((v) => (v == null || v =
 export const manilaISODate = (d = new Date()) => new Date(d.getTime() + 8 * 3600_000).toISOString().slice(0, 10);
 
 // ---------- goals ----------
-
-export const GOAL_STATUSES = ["NOT_STARTED", "ON_TRACK", "AT_RISK", "DONE", "DROPPED"] as const;
-export type GoalStatus = (typeof GOAL_STATUSES)[number];
-export const GOAL_STATUS_LABELS: Record<GoalStatus, string> = { NOT_STARTED: "Not started", ON_TRACK: "On track", AT_RISK: "At risk", DONE: "Done", DROPPED: "Dropped" };
 
 export const goalSchema = z.object({
   employeeId: opt(),
@@ -68,8 +65,6 @@ export function parseActionItems(text: string | undefined, previous: ActionItem[
 
 // ---------- training ----------
 
-export const TRAINING_STATUSES = ["SCHEDULED", "COMPLETED", "CANCELLED"] as const;
-export type TrainingStatus = (typeof TRAINING_STATUSES)[number];
 export const ATTENDEE_STATUSES = ["INVITED", "ATTENDED", "ABSENT"] as const;
 export type AttendeeStatus = (typeof ATTENDEE_STATUSES)[number];
 
@@ -116,9 +111,6 @@ export const trainingFeedbackSchema = z.object({
 
 export const SURVEY_STATUSES = ["DRAFT", "OPEN", "CLOSED"] as const;
 export type SurveyStatus = (typeof SURVEY_STATUSES)[number];
-export const QUESTION_TYPES = ["rating", "nps", "choice", "text"] as const;
-export type QuestionType = (typeof QUESTION_TYPES)[number];
-export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = { rating: "Rating 1-5", nps: "eNPS 0-10", choice: "Single choice", text: "Free text" };
 /** Department breakdowns only show groups with at least this many responses (k-anonymity). */
 export const K_ANON_MIN = 5;
 

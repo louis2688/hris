@@ -27,10 +27,9 @@ const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0]!.toLowerCase() +
 export default async function CertificatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireSession();
-  const c = await getCertificate(id).catch(() => null);
+  const [c, company] = await Promise.all([getCertificate(id).catch(() => null), getSetting("company")]);
   // Only the employee and HR/Admin; 404 rather than 403 so ids don't leak.
   if (!c || c.status !== "APPROVED" || !(c.employeeId === user.employeeId || isStaff(user))) notFound();
-  const company = await getSetting("company");
   const e = c.employee;
   const name = [e.firstName, e.middleName ? `${e.middleName[0]}.` : null, e.lastName].filter(Boolean).join(" ");
   const honorific = e.gender === "MALE" ? "Mr." : e.gender === "FEMALE" ? "Ms." : "";

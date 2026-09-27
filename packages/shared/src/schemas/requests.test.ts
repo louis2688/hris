@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { expenseSchema, loanSchema, otMinutes, otRange, overtimeSchema } from "./requests";
+import { otMinutes, otRange } from "../constants";
+import { expenseSchema, loanSchema, overtimeSchema } from "./requests";
 
 describe("requests", () => {
   it("computes OT minutes, crossing midnight", () => {

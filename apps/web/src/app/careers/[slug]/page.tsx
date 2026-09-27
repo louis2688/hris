@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getSetting } from "@/server/services/settings";
-import { getPublicVacancy } from "@/server/services/careers";
+import { getListedVacancy } from "@/server/services/careers";
 import { fmtDate } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { ApplyForm } from "./apply-form";
@@ -11,8 +11,8 @@ import { ApplyForm } from "./apply-form";
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ ref?: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const [{ slug }, company] = await Promise.all([params, getSetting("company")]);
-  const v = await getPublicVacancy(slug);
+  const { slug } = await params;
+  const [company, v] = await Promise.all([getSetting("company"), getListedVacancy(slug)]);
   if (!v) return { title: { absolute: `Careers at ${company.name}` } };
   const description = (v.description ?? `Join ${company.name} as ${v.title}.`).replace(/\s+/g, " ").slice(0, 160);
   return { title: { absolute: `${v.title} - Careers at ${company.name}` }, description, openGraph: { title: `${v.title} at ${company.name}`, description } };
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function JobPage({ params, searchParams }: Props) {
   const [{ slug }, { ref }] = await Promise.all([params, searchParams]);
-  const v = await getPublicVacancy(slug);
+  const v = await getListedVacancy(slug);
   if (!v) notFound();
   const facts = [
     ["Department", v.department?.name],

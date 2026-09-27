@@ -1,5 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { prisma } from "@hris/db";
 import { careersApplySchema } from "@hris/shared";
 import { audit } from "./audit";
@@ -9,14 +11,26 @@ import { AppError } from "./errors";
 import { manilaToday } from "./onboarding";
 import { rateLimit } from "../rate-limit";
 
+export const VACANCIES_TAG = "vacancies";
+
 /** Open, public, not past closesAt (Manila calendar day). */
 const listed = () => ({ status: "OPEN" as const, isPublic: true, slug: { not: null }, OR: [{ closesAt: null }, { closesAt: { gte: manilaToday() } }] });
 
-const pub = { id: true, title: true, slug: true, description: true, closesAt: true, positions: true, createdAt: true, department: { select: { name: true } }, location: { select: { name: true, city: true } }, jobTitle: { select: { name: true } } } as const;
-
-export const listPublicVacancies = () => prisma.vacancy.findMany({ where: listed(), orderBy: { createdAt: "desc" }, select: pub });
+const pub = { id: true, title: true, slug: true, description: true, closesAt: true, positions: true, department: { select: { name: true } }, location: { select: { name: true, city: true } }, jobTitle: { select: { name: true } } } as const;
 
 export const getPublicVacancy = (slug: string) => prisma.vacancy.findFirst({ where: { ...listed(), slug }, select: pub });
+
+// Anonymous, bot-reachable pages read through a 60 s cache; vacancy writes in recruitment.ts expire it right away.
+// The cache stores JSON, so closesAt comes back as a string and is revived here.
+const revive = <T extends { closesAt: Date | string | null }>(v: T) => ({ ...v, closesAt: v.closesAt ? new Date(v.closesAt) : null });
+const opts = { revalidate: 60, tags: [VACANCIES_TAG] };
+const cachedList = unstable_cache(() => prisma.vacancy.findMany({ where: listed(), orderBy: { createdAt: "desc" }, select: pub }), ["careers:list"], opts);
+const cachedOne = unstable_cache(getPublicVacancy, ["careers:job"], opts);
+export const listPublicVacancies = cache(async () => (await cachedList()).map(revive));
+export const getListedVacancy = cache(async (slug: string) => {
+  const v = await cachedOne(slug);
+  return v ? revive(v) : null;
+});
 
 export type ApplyResult = ActionResult;
 const done: ApplyResult = { ok: true, data: undefined };

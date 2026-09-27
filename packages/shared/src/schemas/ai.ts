@@ -1,6 +1,6 @@
 import { z } from "zod";
+import { AI_MAX_INPUT } from "../constants";
 
-export const AI_MAX_INPUT = 2000;
 /** Only the last N chat turns are sent to the model (conversation lives in client state only). */
 export const AI_HISTORY = 12;
 
@@ -29,6 +29,3 @@ export function aiProviderFor(env: Record<string, string | undefined>): "mock" |
   if (env.AI_PROVIDER === "mock") return "mock";
   return env.ANTHROPIC_API_KEY ? "anthropic" : null;
 }
-
-/** Badge tone for an AI match score. */
-export const aiScoreTone = (s: number) => (s >= 75 ? "green" : s >= 50 ? "amber" : "red") as "green" | "amber" | "red";

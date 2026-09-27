@@ -3,11 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   BarChart3,
-  Bell,
   Briefcase,
   ClipboardList,
   Clock,
@@ -47,6 +45,8 @@ import { logoutAction } from "@/server/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
+// ponytail: nav links don't prefetch. Every page is dynamic (CSP nonce), so viewport prefetch only fired ~60 near-empty
+// RSC requests per page view; clicks still show (app)/loading.tsx as soon as the server answers.
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; roles?: SessionUser["role"][]; group: "me" | "manage" };
 
 const MANAGERS: SessionUser["role"][] = ["MANAGER", "HR", "ADMIN"];
@@ -94,7 +94,7 @@ function activeHref(pathname: string, items: NavItem[]) {
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 }
 
-export function AppShell({ user, unread, children }: { user: SessionUser; unread: number; children: React.ReactNode }) {
+export function AppShell({ user, bell, children }: { user: SessionUser; bell: React.ReactNode; children: React.ReactNode }) {
   const pathname = usePathname();
   const nav = useNav(user);
   const [open, setOpen] = React.useState(false);
@@ -111,6 +111,7 @@ export function AppShell({ user, unread, children }: { user: SessionUser; unread
           {header ? <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Manage</p> : null}
           <Link
             href={n.href}
+            prefetch={false}
             className={cn(
               "group relative flex h-10 items-center gap-3 rounded-full px-3.5 text-sm font-medium transition-colors duration-150",
               active ? "bg-ink text-on-dark" : "text-slate-600 hover:bg-ink/5 hover:text-ink",
@@ -170,10 +171,7 @@ export function AppShell({ user, unread, children }: { user: SessionUser; unread
             </div>
             <div className="ml-auto flex items-center gap-2">
               <ThemeToggle />
-              <Link href="/dashboard#notifications" className="relative flex size-10 items-center justify-center rounded-full text-ink hover:bg-ink/5" aria-label={`${unread} unread notifications`}>
-                <Bell className="size-5" />
-                {unread > 0 ? <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-red-500 ring-2 ring-canvas" /> : null}
-              </Link>
+              {bell}
               <div className="hidden items-center gap-2 lg:flex">
                 <span className="text-sm font-medium text-ink">{user.name}</span>
                 <span className="rounded-full bg-card px-2.5 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-inset ring-hairline">{ROLE_LABELS[user.role]}</span>
@@ -190,7 +188,7 @@ export function AppShell({ user, unread, children }: { user: SessionUser; unread
             {nav.slice(0, 5).map((n) => {
               const active = current === n.href;
               return (
-                <Link key={n.href} href={n.href} className={cn("flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors", active ? "font-semibold text-ink" : "text-slate-500")} aria-current={active ? "page" : undefined}>
+                <Link key={n.href} href={n.href} prefetch={false} className={cn("flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors", active ? "font-semibold text-ink" : "text-slate-500")} aria-current={active ? "page" : undefined}>
                   <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-ink text-on-dark")}>
                     <n.icon className="size-5" />
                   </span>
@@ -207,7 +205,7 @@ export function AppShell({ user, unread, children }: { user: SessionUser; unread
 
 function Brand() {
   return (
-    <Link href="/dashboard" className="flex h-16 items-center gap-2.5 px-5">
+    <Link href="/dashboard" prefetch={false} className="flex h-16 items-center gap-2.5 px-5">
       <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">
         <Building2 className="size-4" />
       </span>
@@ -216,10 +214,15 @@ function Brand() {
   );
 }
 
+// ponytail: native popover instead of Radix DropdownMenu (~18 KB gz of menu + floating-ui on every page); no arrow-key roving, Tab/Esc/click-outside work natively.
 function UserMenu({ user }: { user: SessionUser }) {
+  const id = React.useId();
+  const ref = React.useRef<HTMLDivElement>(null);
+  const close = () => ref.current?.hidePopover();
+  const item = "flex w-full cursor-pointer items-center gap-2 rounded-full px-3 py-2 text-sm outline-none";
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger className="flex w-full items-center gap-3 rounded-full px-2 py-2 text-left transition-colors hover:bg-ink/5">
+    <>
+      <button type="button" popoverTarget={id} className="flex w-full items-center gap-3 rounded-full px-2 py-2 text-left transition-colors hover:bg-ink/5">
         <span className="flex size-9 items-center justify-center rounded-full bg-card text-xs font-semibold text-ink ring-1 ring-hairline">
           {user.name
             .split(" ")
@@ -233,40 +236,27 @@ function UserMenu({ user }: { user: SessionUser }) {
           <span className="block truncate text-xs text-slate-500">{ROLE_LABELS[user.role]}</span>
         </span>
         <ChevronDown className="size-4 text-slate-400" />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content sideOffset={8} align="start" className="z-50 w-56 rounded-2xl bg-card p-1.5 shadow-float">
-          <div className="px-3 py-2">
-            <p className="truncate text-xs text-slate-500">{user.email}</p>
-          </div>
-          <DropdownMenu.Separator className="my-1 h-px bg-hairline" />
-          <DropdownMenu.Item asChild>
-            <Link href="/me" className="flex cursor-pointer items-center gap-2 rounded-full px-3 py-2 text-sm text-ink outline-none hover:bg-bone focus:bg-bone">
-              <User className="size-4" /> My profile
-            </Link>
-          </DropdownMenu.Item>
-          <DropdownMenu.Item asChild>
-            <Link href="/me/password" className="flex cursor-pointer items-center gap-2 rounded-full px-3 py-2 text-sm text-ink outline-none hover:bg-bone focus:bg-bone">
-              <KeyRound className="size-4" /> Change password
-            </Link>
-          </DropdownMenu.Item>
-          <DropdownMenu.Item asChild>
-            <Link href="/me/security" className="flex cursor-pointer items-center gap-2 rounded-full px-3 py-2 text-sm text-ink outline-none hover:bg-bone focus:bg-bone">
-              <Fingerprint className="size-4" /> Fingerprint &amp; Face ID
-            </Link>
-          </DropdownMenu.Item>
-          <DropdownMenu.Separator className="my-1 h-px bg-hairline" />
-          <DropdownMenu.Item asChild>
-            <button
-              type="button"
-              onClick={() => logoutAction()}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-full px-3 py-2 text-sm text-red-600 outline-none hover:bg-red-50 focus:bg-red-50"
-            >
-              <LogOut className="size-4" /> Sign out
-            </button>
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+      </button>
+      {/* Opens above the trigger, which sits at the bottom-left of both the sidebar and the mobile drawer. */}
+      <div ref={ref} id={id} popover="auto" className="inset-auto bottom-[72px] left-3 m-0 w-56 rounded-2xl border-0 bg-card p-1.5 text-ink shadow-float">
+        <div className="px-3 py-2">
+          <p className="truncate text-xs text-slate-500">{user.email}</p>
+        </div>
+        <div className="my-1 h-px bg-hairline" />
+        <Link href="/me" prefetch={false} onClick={close} className={cn(item, "text-ink hover:bg-bone focus:bg-bone")}>
+          <User className="size-4" /> My profile
+        </Link>
+        <Link href="/me/password" prefetch={false} onClick={close} className={cn(item, "text-ink hover:bg-bone focus:bg-bone")}>
+          <KeyRound className="size-4" /> Change password
+        </Link>
+        <Link href="/me/security" prefetch={false} onClick={close} className={cn(item, "text-ink hover:bg-bone focus:bg-bone")}>
+          <Fingerprint className="size-4" /> Fingerprint &amp; Face ID
+        </Link>
+        <div className="my-1 h-px bg-hairline" />
+        <button type="button" onClick={() => logoutAction()} className={cn(item, "text-left text-red-600 hover:bg-red-50 focus:bg-red-50")}>
+          <LogOut className="size-4" /> Sign out
+        </button>
+      </div>
+    </>
   );
 }

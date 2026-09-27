@@ -4,7 +4,7 @@
  * so HR can update them in Settings > Payroll without a deploy.
  */
 import type { DtrRangeTotals } from "./dtr";
-import { LOAN_TYPE_LABELS } from "./schemas/requests";
+import { LOAN_TYPE_LABELS } from "./constants";
 
 export type TaxBracket = { over: number; base: number; rate: number };
 
