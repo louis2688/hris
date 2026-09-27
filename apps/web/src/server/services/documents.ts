@@ -158,3 +158,29 @@ export async function remove(u: SessionUser, id: string) {
   await audit(u.id, "document.delete", d.candidateId ? "Candidate" : "Employee", d.candidateId ?? d.employeeId, { before: d });
   return { employeeId: d.employeeId, candidateId: d.candidateId };
 }
+
+/** Expense receipt: the employee's own file, category OTHER, visible to them (and their manager). PDF or image only. */
+export async function uploadReceipt(u: SessionUser, employeeId: string, f: File) {
+  if (u.employeeId !== employeeId && !isStaff(u)) throw forbidden();
+  if (!f || typeof f.arrayBuffer !== "function" || f.size === 0) throw new AppError("Choose a receipt to upload");
+  if (f.size > MAX_DOC_BYTES) throw new AppError("Receipt is larger than 5 MB");
+  const bytes = Buffer.from(await f.arrayBuffer());
+  const type = sniff(bytes);
+  if (!type || !(type.mime === "application/pdf" || type.mime.startsWith("image/"))) throw new AppError("Receipt must be a PDF, JPG, PNG or WEBP", "UNSUPPORTED_TYPE", 415);
+  const row = await prisma.document.create({
+    data: {
+      employeeId,
+      category: "OTHER",
+      name: sanitizeName(f.name || "receipt", type.ext),
+      mimeType: type.mime,
+      size: bytes.length,
+      data: bytes,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      uploadedById: u.id,
+      visibleToEmployee: true,
+    },
+    select: { id: true, name: true },
+  });
+  await audit(u.id, "document.upload", "Employee", employeeId, { after: { ...row, category: "OTHER", receipt: true } });
+  return row;
+}
