@@ -9,7 +9,7 @@ import { cn, fmtDate, fullName } from "@/lib/utils";
 export function ProfileHero({ e, actions }: { e: EmployeeDetail; actions?: React.ReactNode }) {
   return (
     <Card className="mb-6 overflow-hidden">
-      <div className="h-20 bg-ink" aria-hidden />
+      <div className="h-20 bg-blue-600 dark:bg-blue-800" aria-hidden />
       <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <Avatar first={e.firstName} last={e.lastName} src={e.avatarUrl} size="xl" className="-mt-14 shrink-0 ring-4 ring-card" />
         <div className="min-w-0 flex-1">
