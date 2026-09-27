@@ -17,3 +17,7 @@ export * from "./schemas/people";
 export * from "./schemas/scheduling";
 export * from "./schemas/platform";
 export * from "./schemas/ai";
+export * from "./schemas/timeoff";
+export * from "./schemas/hiring";
+export * from "./schemas/lifecycle";
+export * from "./schemas/growth";

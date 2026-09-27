@@ -35,6 +35,11 @@ import {
   Banknote,
   ListChecks,
   Laptop,
+  GraduationCap,
+  MessageSquareHeart,
+  DoorOpen,
+  HeartPulse,
+  Scale,
 } from "lucide-react";
 import type { SessionUser } from "@hris/shared";
 import { ROLE_LABELS } from "@hris/shared";
@@ -59,6 +64,8 @@ const NAV: NavItem[] = [
   { href: "/requests", label: "Requests", icon: Inbox, group: "me" },
   { href: "/payslips", label: "Payslips", icon: Wallet, group: "me" },
   { href: "/announcements", label: "Announcements", icon: Megaphone, group: "me" },
+  { href: "/training", label: "Training", icon: GraduationCap, group: "me" },
+  { href: "/surveys", label: "Surveys", icon: MessageSquareHeart, group: "me" },
   { href: "/org-chart", label: "Org chart", icon: Network, group: "me" },
   { href: "/assistant", label: "HR Assistant", icon: Sparkles, group: "me" },
   { href: "/team", label: "My Team", icon: UsersRound, roles: MANAGERS, group: "manage" },
@@ -69,6 +76,9 @@ const NAV: NavItem[] = [
   { href: "/payroll", label: "Payroll", icon: Banknote, roles: STAFF, group: "manage" },
   { href: "/onboarding", label: "Onboarding", icon: ListChecks, roles: STAFF, group: "manage" },
   { href: "/assets", label: "Assets", icon: Laptop, roles: STAFF, group: "manage" },
+  { href: "/benefits", label: "Benefits", icon: HeartPulse, roles: STAFF, group: "manage" },
+  { href: "/separations", label: "Separations", icon: DoorOpen, roles: STAFF, group: "manage" },
+  { href: "/cases", label: "Cases", icon: Scale, roles: STAFF, group: "manage" },
   { href: "/reports", label: "Reports", icon: BarChart3, roles: MANAGERS, group: "manage" },
   { href: "/settings", label: "Settings", icon: Settings, roles: STAFF, group: "manage" },
 ];

@@ -9,7 +9,7 @@ const money = z.coerce.number({ error: "Enter an amount" }).min(0, "Cannot be ne
 
 export const PAYROLL_STATUSES = ["DRAFT", "FINALIZED", "PAID"] as const;
 export const PAYROLL_STATUS_LABELS = { DRAFT: "Draft", FINALIZED: "Finalized", PAID: "Paid" } as const;
-export const PAYROLL_KIND_LABELS = { REGULAR: "Regular", THIRTEENTH_MONTH: "13th month" } as const;
+export const PAYROLL_KIND_LABELS = { REGULAR: "Regular", THIRTEENTH_MONTH: "13th month", OFF_CYCLE: "Off-cycle", FINAL_PAY: "Final pay" } as const;
 export const PAY_TYPE_LABELS = { MONTHLY: "Monthly", DAILY: "Daily" } as const;
 
 export const createPayrollRunSchema = z
