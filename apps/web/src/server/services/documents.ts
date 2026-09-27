@@ -4,8 +4,9 @@ import { DocumentCategory, prisma } from "@hris/db";
 import type { SessionUser } from "@hris/shared";
 import { AuthError } from "../auth/session";
 import { canAccessEmployee, isStaff } from "../authz";
-import { audit } from "./audit";
+import { audit, notify } from "./audit";
 import { AppError, notFound } from "./errors";
+import { manilaToday } from "./onboarding";
 
 export const MAX_DOC_BYTES = 5 * 1024 * 1024;
 export const SELF_UPLOAD_CATEGORIES: DocumentCategory[] = ["ID", "CERTIFICATE"];
@@ -20,6 +21,9 @@ const meta = {
   visibleToEmployee: true,
   uploadedById: true,
   createdAt: true,
+  expiresAt: true,
+  requiresAck: true,
+  acks: { select: { ackedAt: true }, take: 1 },
   uploadedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true, preferredName: true } } } },
 } as const;
 
@@ -75,7 +79,8 @@ const canDelete = (u: SessionUser, d: Owner & { uploadedById: string | null }) =
 export async function listForEmployee(u: SessionUser, employeeId: string) {
   if (!(await canAccessEmployee(u, employeeId))) throw forbidden();
   const rows = await prisma.document.findMany({
-    where: { employeeId, ...(isStaff(u) ? {} : { visibleToEmployee: true }) },
+    // Case files live on the case page (HR only), not in the employee's document list.
+    where: { employeeId, caseId: null, ...(isStaff(u) ? {} : { visibleToEmployee: true }) },
     select: meta,
     orderBy: { createdAt: "desc" },
   });
@@ -92,7 +97,7 @@ export type DocumentRow = Awaited<ReturnType<typeof listForEmployee>>[number];
 
 export async function upload(
   u: SessionUser,
-  input: { employeeId?: string | null; candidateId?: string | null; category: string; visibleToEmployee?: boolean; file: File },
+  input: { employeeId?: string | null; candidateId?: string | null; category: string; visibleToEmployee?: boolean; file: File; expiresAt?: string | null; requiresAck?: boolean; caseId?: string | null },
 ) {
   const employeeId = input.employeeId || null;
   const candidateId = input.candidateId || null;
@@ -100,6 +105,10 @@ export async function upload(
   if (!CATEGORIES.includes(input.category as DocumentCategory)) throw new AppError("Pick a valid category");
   const category = input.category as DocumentCategory;
   if (candidateId ? !isStaff(u) : !uploadCategories(u, employeeId).includes(category)) throw forbidden();
+  if ((input.requiresAck || input.caseId) && !isStaff(u)) throw forbidden();
+  if (input.expiresAt && !/^\d{4}-\d{2}-\d{2}$/.test(input.expiresAt)) throw new AppError("Pick a valid expiry date");
+  // Must-acknowledge docs have to be visible to the employee; case files never are.
+  const visible = input.caseId ? false : input.requiresAck ? true : isStaff(u) ? input.visibleToEmployee !== false : true;
 
   const f = input.file;
   if (!f || typeof f.arrayBuffer !== "function" || f.size === 0) throw new AppError("Choose a file to upload");
@@ -124,9 +133,12 @@ export async function upload(
       sha256: createHash("sha256").update(bytes).digest("hex"),
       uploadedById: u.id,
       // Non-staff can only upload their own docs, which they must be able to see.
-      visibleToEmployee: isStaff(u) ? input.visibleToEmployee !== false : true,
+      visibleToEmployee: visible,
+      expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+      requiresAck: !!input.requiresAck && !!employeeId,
+      caseId: input.caseId || null,
     },
-    select: { id: true, name: true, category: true, mimeType: true, size: true, sha256: true, visibleToEmployee: true },
+    select: { id: true, name: true, category: true, mimeType: true, size: true, sha256: true, visibleToEmployee: true, expiresAt: true, requiresAck: true, caseId: true },
   });
   await audit(u.id, "document.upload", candidateId ? "Candidate" : "Employee", candidateId ?? employeeId, { after: row });
   return row;
@@ -183,4 +195,61 @@ export async function uploadReceipt(u: SessionUser, employeeId: string, f: File)
   });
   await audit(u.id, "document.upload", "Employee", employeeId, { after: { ...row, category: "OTHER", receipt: true } });
   return row;
+}
+
+// ---------- Acknowledgment ----------
+
+/** The employee confirms they read a must-acknowledge document. Idempotent. */
+export async function acknowledge(u: SessionUser, id: string) {
+  const d = await prisma.document.findUnique({ where: { id }, select: { id: true, name: true, employeeId: true, requiresAck: true, visibleToEmployee: true } });
+  if (!d || !d.employeeId || d.employeeId !== u.employeeId || !d.visibleToEmployee) throw notFound("Document");
+  if (!d.requiresAck) throw new AppError("This document does not need an acknowledgment");
+  const existing = await prisma.documentAck.findUnique({ where: { documentId_userId: { documentId: id, userId: u.id } } });
+  if (existing) return existing;
+  const row = await prisma.documentAck.upsert({ where: { documentId_userId: { documentId: id, userId: u.id } }, create: { documentId: id, userId: u.id }, update: {} });
+  await audit(u.id, "document.ack", "Employee", d.employeeId, { after: { documentId: id, name: d.name } });
+  return row;
+}
+
+// ---------- Case files ----------
+
+export function listForCase(caseId: string) {
+  return prisma.document.findMany({ where: { caseId }, select: meta, orderBy: { createdAt: "desc" } });
+}
+
+// ---------- Expiry ----------
+
+const DAY = 86_400_000;
+export const EXPIRY_NOTICE_DAYS = [30, 7, 0];
+
+/**
+ * Daily job: notify HR and the employee 30 and 7 days before a document expires and on the day.
+ * Deduped per user+link+title per day, so a second run the same day sends nothing. Returns notifications sent.
+ * ponytail: exact-day thresholds; a skipped cron day skips that reminder. Widen to ranges + a sent-log if that matters.
+ */
+export async function runDailyDocumentExpiry(): Promise<number> {
+  const today = manilaToday();
+  const docs = await prisma.document.findMany({
+    where: { employeeId: { not: null }, caseId: null, expiresAt: { in: EXPIRY_NOTICE_DAYS.map((n) => new Date(today.getTime() + n * DAY)) }, employee: { deletedAt: null } },
+    select: { id: true, name: true, expiresAt: true, visibleToEmployee: true, employeeId: true, employee: { select: { firstName: true, lastName: true, preferredName: true, userId: true } } },
+  });
+  if (!docs.length) return 0;
+  let hr = await prisma.user.findMany({ where: { role: "HR", isActive: true }, select: { id: true } });
+  if (!hr.length) hr = await prisma.user.findMany({ where: { role: "ADMIN", isActive: true }, select: { id: true } });
+  // Start of today in Manila, as an instant.
+  const since = new Date(today.getTime() - 8 * 3_600_000);
+  let sent = 0;
+  const send = async (userId: string, title: string, body: string, link: string) => {
+    if (await prisma.notification.findFirst({ where: { userId, title, link, createdAt: { gte: since } }, select: { id: true } })) return;
+    await notify(userId, title, body, link);
+    sent++;
+  };
+  for (const d of docs) {
+    const days = Math.round((d.expiresAt!.getTime() - today.getTime()) / DAY);
+    const when = days === 0 ? "expires today" : `expires in ${days} days`;
+    const who = `${d.employee!.preferredName ?? d.employee!.firstName} ${d.employee!.lastName}`;
+    for (const u of hr) await send(u.id, `${who}: ${d.name} ${when}`, "Renew or replace the document before it lapses.", `/employees/${d.employeeId}?tab=documents`);
+    if (d.visibleToEmployee && d.employee!.userId) await send(d.employee!.userId, `Your document ${d.name} ${when}`, "Please submit a renewed copy to HR.", "/me?tab=documents");
+  }
+  return sent;
 }

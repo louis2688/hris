@@ -7,12 +7,15 @@ import {
   EMPLOYMENT_STATUS_LABELS,
   EMPLOYMENT_TYPE_LABELS,
   TIMESHEET_STATUSES,
+  accruedDays,
   zonedParts,
   type SessionUser,
 } from "@hris/shared";
 import { scopeWhere } from "../authz";
 import { dtrEmployeeSelect, dtrTotalsForMonth } from "./attendance";
 import { fullName } from "./employees";
+import { listFieldDefs, fmtCustom } from "./custom-fields";
+import { describeChange } from "./employment-events";
 import { fmtDate } from "@/lib/utils";
 
 export type Cell = string | number;
@@ -44,6 +47,8 @@ const filterSchema = z.object({
   projectId: opt(id),
   status: opt(z.string().max(32)),
   groupBy: z.enum(["department", "status", "type"]).catch("department"),
+  type: opt(z.enum(["PROMOTION", "TRANSFER"])),
+  days: opt(z.coerce.number().int().min(1).max(365)),
   cols: z.array(z.string()).catch([]),
 });
 
@@ -132,7 +137,7 @@ async function leave(user: SessionUser, p: URLSearchParams): Promise<Report> {
   const f = parse(p);
   const year = f.year ?? Number(f.today.slice(0, 4));
   const [emps, types] = await Promise.all([
-    prisma.employee.findMany({ where: scope(user, f.departmentId), orderBy: [{ lastName: "asc" }, { firstName: "asc" }], select: whoSelect }),
+    prisma.employee.findMany({ where: scope(user, f.departmentId), orderBy: [{ lastName: "asc" }, { firstName: "asc" }], select: { ...whoSelect, hireDate: true } }),
     prisma.leaveType.findMany({ where: { isActive: true, ...(f.leaveTypeId ? { id: f.leaveTypeId } : {}) }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
   ]);
   const ids = emps.map((e) => e.id);
@@ -145,13 +150,17 @@ async function leave(user: SessionUser, p: URLSearchParams): Promise<Report> {
       _sum: { totalDays: true },
     }),
   ]);
-  const ent = new Map(ents.map((e) => [`${e.employeeId}:${e.leaveTypeId}`, Number(e.entitledDays) + Number(e.carriedOver) + Number(e.adjustment)]));
+  const ent = new Map(ents.map((e) => [`${e.employeeId}:${e.leaveTypeId}`, e]));
   const use = new Map(usage.map((u) => [`${u.employeeId}:${u.leaveTypeId}:${u.status}`, Number(u._sum.totalDays ?? 0)]));
   const rows: Record<string, Cell>[] = [];
   for (const e of emps)
     for (const t of types) {
       const k = `${e.id}:${t.id}`;
-      const entitled = ent.get(k) ?? 0;
+      const en = ent.get(k);
+      const base = Number(en?.entitledDays ?? 0);
+      // Accruing types show days earned so far, same as getBalances.
+      const earned = t.accrualPerMonth != null ? accruedDays(base, Number(t.accrualPerMonth), year, day(e.hireDate), f.today) : base;
+      const entitled = round(earned + Number(en?.carriedOver ?? 0) + Number(en?.adjustment ?? 0));
       const used = use.get(`${k}:APPROVED`) ?? 0;
       const pending = use.get(`${k}:PENDING`) ?? 0;
       // ponytail: skip employee/type pairs with nothing to report, keeps the sheet readable.
@@ -168,7 +177,7 @@ async function leave(user: SessionUser, p: URLSearchParams): Promise<Report> {
   ];
   return {
     title: "Leave balances",
-    description: `Entitled includes carry-over and adjustments · ${year}`,
+    description: `Entitled includes carry-over and adjustments; accruing types show days earned so far · ${year}`,
     columns,
     rows,
     totals: totalsOf(columns, rows),
@@ -270,6 +279,7 @@ const empSelect = {
   location: { select: { name: true } },
   manager: { select: { firstName: true, lastName: true, preferredName: true } },
   shift: { select: { name: true } },
+  customFields: true,
 } satisfies Prisma.EmployeeSelect;
 type Emp = Prisma.EmployeeGetPayload<{ select: typeof empSelect }>;
 
@@ -295,10 +305,20 @@ export const EMPLOYEE_COLUMNS: { key: string; label: string; get: (e: Emp) => Ce
 ];
 const DEFAULT_COLS = ["code", "name", "department", "jobTitle", "status"];
 
+/** Static columns plus, for HR/Admin, one per active custom field (key `cf_<key>`). */
+export async function employeeColumns(withCustom: boolean) {
+  const defs = withCustom ? await listFieldDefs(true) : [];
+  return [
+    ...EMPLOYEE_COLUMNS,
+    ...defs.map((d) => ({ key: `cf_${d.key}`, label: d.label, get: (e: Emp) => fmtCustom(d, (e.customFields as Record<string, unknown> | null)?.[d.key]) as Cell })),
+  ];
+}
+
 async function employees(user: SessionUser, p: URLSearchParams): Promise<Report> {
   const f = parse(p);
-  let cols = EMPLOYEE_COLUMNS.filter((c) => f.cols.includes(c.key));
-  if (!cols.length) cols = EMPLOYEE_COLUMNS.filter((c) => DEFAULT_COLS.includes(c.key));
+  const all = await employeeColumns(!scopeWhere(user));
+  let cols = all.filter((c) => f.cols.includes(c.key));
+  if (!cols.length) cols = all.filter((c) => DEFAULT_COLS.includes(c.key));
   const status = pick(EMPLOYMENT_STATUSES, f.status);
   const emps = await prisma.employee.findMany({
     where: { ...scope(user, f.departmentId), ...(status ? { employmentStatus: status } : {}), ...(f.locationId ? { locationId: f.locationId } : {}) },
@@ -314,7 +334,123 @@ async function employees(user: SessionUser, p: URLSearchParams): Promise<Report>
   };
 }
 
-export const REPORTS = { headcount, leave, attendance, timesheets, employees } satisfies Record<string, (u: SessionUser, p: URLSearchParams) => Promise<Report>>;
+// ---------- Lifecycle ----------
+
+const DAY = 86_400_000;
+const pct = (n: number, d: number) => (d ? round((n / d) * 100) : 0);
+
+/** Turnover % = separations / average of start and end headcount. Tenure = average years of service at the end date. */
+async function turnover(user: SessionUser, p: URLSearchParams): Promise<Report> {
+  const f = parse(p);
+  const from = f.from ?? `${f.today.slice(0, 4)}-01-01`;
+  const to = f.to ?? f.today;
+  const emps = await prisma.employee.findMany({
+    where: scope(user, f.departmentId),
+    select: { hireDate: true, terminationDate: true, employmentStatus: true, department: { select: { name: true } } },
+  });
+  // Separated with no date recorded: treat as gone before the range (they are not in either headcount).
+  const endOf = (e: (typeof emps)[number]) => (e.terminationDate ? day(e.terminationDate) : (SEPARATED as readonly string[]).includes(e.employmentStatus) ? "0000-00-00" : "9999-99-99");
+  type G = { start: number; end: number; hires: number; separations: number; tenureDays: number };
+  const blank = (): G => ({ start: 0, end: 0, hires: 0, separations: 0, tenureDays: 0 });
+  const groups = new Map<string, G>();
+  const total = blank();
+  const add = (g: G, e: (typeof emps)[number]) => {
+    const hire = day(e.hireDate);
+    const gone = endOf(e);
+    if (hire <= from && gone >= from) g.start++;
+    if (hire <= to && gone > to) {
+      g.end++;
+      g.tenureDays += (new Date(to).getTime() - e.hireDate.getTime()) / DAY;
+    }
+    if (hire >= from && hire <= to) g.hires++;
+    if (e.terminationDate && gone >= from && gone <= to) g.separations++;
+  };
+  for (const e of emps) {
+    const k = e.department?.name ?? "(No department)";
+    add(groups.get(k) ?? groups.set(k, blank()).get(k)!, e);
+    add(total, e);
+  }
+  const row = (group: string, g: G) => ({
+    group,
+    start: g.start,
+    end: g.end,
+    hires: g.hires,
+    separations: g.separations,
+    turnover: pct(g.separations, (g.start + g.end) / 2),
+    tenure: g.end ? round(g.tenureDays / g.end / 365.25) : 0,
+  });
+  const rows = [...groups].filter(([, g]) => g.start || g.end || g.hires || g.separations).sort(([a], [b]) => a.localeCompare(b)).map(([k, g]) => row(k, g));
+  const columns: Column[] = [
+    { key: "group", label: "Department" },
+    { key: "start", label: "Headcount (start)", num: true },
+    { key: "end", label: "Headcount (end)", num: true },
+    { key: "hires", label: "Hires", num: true },
+    { key: "separations", label: "Separations", num: true },
+    { key: "turnover", label: "Turnover %", num: true },
+    { key: "tenure", label: "Avg tenure (yrs)", num: true },
+  ];
+  return {
+    title: "Turnover & tenure",
+    description: `${fmtDate(from)} to ${fmtDate(to)} · turnover = separations / average headcount`,
+    columns,
+    rows,
+    totals: row("Total", total),
+    filters: { from, to, departmentId: f.departmentId ?? "" },
+  };
+}
+
+async function promotions(user: SessionUser, p: URLSearchParams): Promise<Report> {
+  const f = parse(p);
+  const from = f.from ?? `${f.today.slice(0, 4)}-01-01`;
+  const to = f.to ?? f.today;
+  const rows = await prisma.employmentEvent.findMany({
+    where: { type: f.type ? f.type : { in: ["PROMOTION", "TRANSFER"] }, effectiveDate: { gte: new Date(from), lte: new Date(to) }, employee: scope(user, f.departmentId) },
+    orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }],
+    select: { type: true, effectiveDate: true, from: true, to: true, note: true, appliedAt: true, employee: { select: whoSelect } },
+  });
+  const columns: Column[] = [{ key: "date", label: "Effective" }, ...nameCols, { key: "type", label: "Type" }, { key: "change", label: "Change" }, { key: "note", label: "Note" }, { key: "status", label: "Status" }];
+  return {
+    title: "Promotions & transfers",
+    description: `${f.type ? title(f.type) + "s" : "Promotions and transfers"} effective ${fmtDate(from)} to ${fmtDate(to)}`,
+    columns,
+    rows: rows.map((r) => ({
+      date: day(r.effectiveDate),
+      ...who(r.employee),
+      type: title(r.type),
+      change: describeChange(r.from, r.to).map((c) => `${c.label}: ${c.from ? `${c.from} -> ` : ""}${c.to ?? "None"}`).join("; "),
+      note: r.note ?? "",
+      status: r.appliedAt ? "Applied" : "Scheduled",
+    })),
+    filters: { from, to, type: f.type ?? "", departmentId: f.departmentId ?? "" },
+  };
+}
+
+/** Employee documents already expired or expiring within `days` (default 60). Managers see only docs visible to the employee. */
+async function expiringDocuments(user: SessionUser, p: URLSearchParams): Promise<Report> {
+  const f = parse(p);
+  const days = f.days ?? 60;
+  const today = new Date(f.today);
+  const docs = await prisma.document.findMany({
+    where: {
+      caseId: null,
+      expiresAt: { not: null, lte: new Date(today.getTime() + days * DAY) },
+      employee: scope(user, f.departmentId),
+      ...(scopeWhere(user) ? { visibleToEmployee: true } : {}),
+    },
+    orderBy: { expiresAt: "asc" },
+    select: { name: true, category: true, expiresAt: true, employee: { select: whoSelect } },
+  });
+  const columns: Column[] = [...nameCols, { key: "document", label: "Document" }, { key: "category", label: "Category" }, { key: "expires", label: "Expires" }, { key: "daysLeft", label: "Days left", num: true }];
+  return {
+    title: "Expiring documents",
+    description: `Expired, or expiring within ${days} days of ${fmtDate(f.today)}`,
+    columns,
+    rows: docs.map((d) => ({ ...who(d.employee!), document: d.name, category: title(d.category), expires: day(d.expiresAt), daysLeft: Math.round((d.expiresAt!.getTime() - today.getTime()) / DAY) })),
+    filters: { days: String(days), departmentId: f.departmentId ?? "" },
+  };
+}
+
+export const REPORTS = { headcount, leave, attendance, timesheets, employees, turnover, promotions, "expiring-documents": expiringDocuments } satisfies Record<string, (u: SessionUser, p: URLSearchParams) => Promise<Report>>;
 export type ReportSlug = keyof typeof REPORTS;
 export const isReportSlug = (s: string): s is ReportSlug => Object.hasOwn(REPORTS, s);
 

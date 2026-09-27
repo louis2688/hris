@@ -22,6 +22,10 @@ import { DocumentsCard } from "@/components/documents-card";
 import { listForEmployee, uploadCategories } from "@/server/services/documents";
 import type { SessionUser } from "@hris/shared";
 import { AssetsTab, OnboardingTab } from "./people-tabs";
+import { HistoryTab } from "./history-tab";
+import { listFieldDefs, fmtCustom } from "@/server/services/custom-fields";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { DL } from "@/components/profile";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -37,6 +41,7 @@ const TABS = [
   { key: "overview", label: "Overview" },
   { key: "personal", label: "Personal" },
   { key: "job", label: "Job" },
+  { key: "history", label: "Job history" },
   { key: "contact", label: "Contact" },
   { key: "emergency", label: "Emergency" },
   { key: "qualifications", label: "Qualifications" },
@@ -87,10 +92,16 @@ export default async function EmployeePage({ params, searchParams }: { params: P
       />
       <TabNav base={`/employees/${e.id}`} tabs={tabs} active={active} />
 
-      {active === "overview" ? <ProfileOverview e={e} showLinks /> : null}
-      {active === "personal" || active === "job" || active === "contact" ? (
-        <EmployeeForm mode="edit" id={e.id} initial={e} options={await loadFormOptions()} section={active} />
+      {active === "overview" ? (
+        <>
+          <ProfileOverview e={e} showLinks />
+          {staff ? <CustomFieldsCard values={e.customFields} /> : null}
+        </>
       ) : null}
+      {active === "personal" || active === "job" || active === "contact" ? (
+        <EmployeeForm mode="edit" id={e.id} initial={e} options={await loadFormOptions()} section={active} customFields={{ defs: await listFieldDefs(true), values: e.customFields }} />
+      ) : null}
+      {active === "history" ? <HistoryTab employeeId={e.id} /> : null}
       {active === "emergency" ? <EmergencyContacts employeeId={e.id} contacts={e.emergencyContacts} /> : null}
       {active === "qualifications" ? <QualTab employeeId={e.id} /> : null}
       {active === "leave" ? <LeaveTab employeeId={e.id} staff={staff} /> : null}
@@ -124,4 +135,18 @@ async function LeaveTab({ employeeId, staff }: { employeeId: string; staff: bool
 
 async function DocumentsTab({ user, employeeId }: { user: SessionUser; employeeId: string }) {
   return <DocumentsCard docs={await listForEmployee(user, employeeId)} employeeId={employeeId} categories={uploadCategories(user, employeeId)} staff={isStaff(user)} />;
+}
+
+async function CustomFieldsCard({ values }: { values: unknown }) {
+  const defs = await listFieldDefs(true);
+  if (!defs.length) return null;
+  const v = (values ?? {}) as Record<string, unknown>;
+  return (
+    <Card className="mt-6">
+      <CardHeader title="Custom fields" description="Company-specific details, managed in Settings" />
+      <CardBody>
+        <DL cols={3} items={defs.map((d) => [d.label, fmtCustom(d, v[d.key])])} />
+      </CardBody>
+    </Card>
+  );
 }

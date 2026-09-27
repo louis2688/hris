@@ -5,11 +5,12 @@ import { File, FileImage, FileSpreadsheet, FileText, Trash2, Upload } from "luci
 import { toast } from "sonner";
 import type { DocumentCategory } from "@hris/db";
 import { deleteDocumentAction, uploadDocumentAction } from "@/server/actions/documents";
+import { acknowledgeDocumentAction } from "@/server/actions/lifecycle";
 import { ActionForm, ConfirmButton, FormField } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Checkbox, Select } from "@/components/ui/input";
+import { Checkbox, Input, Select } from "@/components/ui/input";
 import { fmtDate } from "@/lib/utils";
 
 const MAX = 5 * 1024 * 1024;
@@ -33,10 +34,25 @@ export type DocItem = {
   visibleToEmployee: boolean;
   createdAt: Date;
   canDelete: boolean;
+  expiresAt?: Date | null;
+  requiresAck?: boolean;
+  acks?: { ackedAt: Date }[];
   uploadedBy: { email: string; employee: { firstName: string; lastName: string; preferredName: string | null } | null } | null;
 };
 
 const fmtSize = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+
+const DAY = 86_400_000;
+const manilaToday = () => new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }));
+
+/** Expired / expiring within 30 days / valid-until badge. expiresAt is a date-only (UTC midnight) value. */
+function ExpiryBadge({ at }: { at: Date }) {
+  const days = Math.round((new Date(at).getTime() - manilaToday().getTime()) / DAY);
+  if (days < 0) return <Badge tone="red">Expired {fmtDate(at)}</Badge>;
+  if (days === 0) return <Badge tone="red">Expires today</Badge>;
+  if (days <= 30) return <Badge tone="amber">Expires in {days} day{days === 1 ? "" : "s"}</Badge>;
+  return <Badge tone="slate">Valid to {fmtDate(at)}</Badge>;
+}
 
 function DocIcon({ mime }: { mime: string }) {
   const I = mime.startsWith("image/") ? FileImage : mime === "application/pdf" ? FileText : mime.includes("spreadsheet") ? FileSpreadsheet : File;
@@ -50,6 +66,7 @@ export function DocumentsCard({
   categories,
   staff = false,
   description,
+  canAck = false,
 }: {
   docs: DocItem[];
   employeeId?: string;
@@ -59,6 +76,8 @@ export function DocumentsCard({
   /** Shows the "visible to employee" toggle and hidden badge. */
   staff?: boolean;
   description?: string;
+  /** The viewer is the employee and may acknowledge must-read documents. */
+  canAck?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   return (
@@ -89,10 +108,20 @@ export function DocumentsCard({
                   </a>
                   <p className="text-xs text-slate-500">
                     {fmtSize(d.size)} · {by} · {fmtDate(d.createdAt)}
+                    {d.requiresAck ? (d.acks?.length ? ` · Acknowledged on ${fmtDate(d.acks[0]!.ackedAt)}` : " · Not yet acknowledged") : null}
                   </p>
+                  <div className="mt-1 flex flex-wrap gap-1.5 sm:hidden">
+                    <Badges d={d} staff={staff && !!employeeId} />
+                  </div>
                 </div>
-                <Badge tone={CATEGORY[d.category].tone}>{CATEGORY[d.category].label}</Badge>
-                {staff && employeeId && !d.visibleToEmployee ? <Badge tone="red">HR only</Badge> : null}
+                <div className="hidden flex-wrap justify-end gap-1.5 sm:flex">
+                  <Badges d={d} staff={staff && !!employeeId} />
+                </div>
+                {canAck && d.requiresAck && !d.acks?.length ? (
+                  <ConfirmButton action={() => acknowledgeDocumentAction(d.id)} confirm={`Confirm you have read and understood ${d.name}?`} size="sm" variant="secondary">
+                    Acknowledge
+                  </ConfirmButton>
+                ) : null}
                 {d.canDelete ? (
                   <ConfirmButton action={() => deleteDocumentAction(d.id)} confirm={`Delete ${d.name}?`} variant="ghost" size="icon-sm" className="text-red-600">
                     <Trash2 aria-label="Delete" />
@@ -135,15 +164,32 @@ export function DocumentsCard({
                 ))}
               </Select>
             </FormField>
+            {employeeId ? (
+              <FormField label="Expires on" name="expiresAt" hint="Optional. HR and the employee get reminders 30 and 7 days before.">
+                <Input id="expiresAt" name="expiresAt" type="date" />
+              </FormField>
+            ) : null}
             {staff && employeeId ? (
               <>
                 <input type="hidden" name="visibleToEmployee" value="false" />
                 <Checkbox name="visibleToEmployee" value="true" defaultChecked label="Visible to employee" />
+                <Checkbox name="requiresAck" value="true" label="Employee must acknowledge" />
               </>
             ) : null}
           </ActionForm>
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+function Badges({ d, staff }: { d: DocItem; staff: boolean }) {
+  return (
+    <>
+      <Badge tone={CATEGORY[d.category].tone}>{CATEGORY[d.category].label}</Badge>
+      {d.expiresAt ? <ExpiryBadge at={d.expiresAt} /> : null}
+      {d.requiresAck && !d.acks?.length ? <Badge tone="amber">Needs acknowledgment</Badge> : null}
+      {staff && !d.visibleToEmployee ? <Badge tone="red">HR only</Badge> : null}
+    </>
   );
 }

@@ -18,6 +18,10 @@ import { seedPayroll } from "./seeds/payroll";
 import { seedRequests } from "./seeds/requests";
 import { seedScheduling } from "./seeds/scheduling";
 import { seedPeople } from "./seeds/people";
+import { seedTimeoff } from "./seeds/timeoff";
+import { seedHiring } from "./seeds/hiring";
+import { seedLifecycle } from "./seeds/lifecycle";
+import { seedGrowth } from "./seeds/growth";
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 const PASSWORD = process.env.SEED_PASSWORD ?? "Password123!";
@@ -249,8 +253,12 @@ async function main() {
 
   // Feature modules (each idempotent)
   await seedScheduling(prisma);
+  await seedTimeoff(prisma);
   await seedRequests(prisma);
   await seedPeople(prisma);
+  await seedLifecycle(prisma);
+  await seedHiring(prisma);
+  await seedGrowth(prisma);
   await seedPayroll(prisma);
 
   console.log(`Seeded. ${people.length} employees. Password for all demo accounts: ${PASSWORD}`);

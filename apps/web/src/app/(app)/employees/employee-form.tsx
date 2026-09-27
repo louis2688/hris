@@ -19,6 +19,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { isoDate } from "@/lib/utils";
+import { cfName, type CustomFieldDefLike } from "@hris/shared";
 
 export type Option = { id: string; name: string };
 export type EmployeeFormOptions = { departments: Option[]; jobTitles: Option[]; locations: Option[]; managers: Option[]; shifts?: Option[]; nationalities?: string[] };
@@ -59,7 +60,9 @@ type Initial = Partial<{
 const d = (v: Date | null | undefined) => (v ? isoDate(v) : "");
 const cap = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, " ");
 
-export function EmployeeForm({ mode, id, initial = {}, options, section }: { mode: "create" | "edit"; id?: string; initial?: Initial; options: EmployeeFormOptions; section?: "personal" | "job" | "contact" }) {
+export type CustomFieldsProp = { defs: CustomFieldDefLike[]; values: unknown };
+
+export function EmployeeForm({ mode, id, initial = {}, options, section, customFields }: { mode: "create" | "edit"; id?: string; initial?: Initial; options: EmployeeFormOptions; section?: "personal" | "job" | "contact"; customFields?: CustomFieldsProp }) {
   const router = useRouter();
   const [created, setCreated] = React.useState<{ id: string; initialPassword: string | null } | null>(null);
   const showAll = mode === "create";
@@ -224,6 +227,8 @@ export function EmployeeForm({ mode, id, initial = {}, options, section }: { mod
           </Section>
         ) : null}
 
+        {show("personal") && customFields?.defs.length ? <CustomFieldsSection {...customFields} /> : null}
+
         {mode === "create" ? <AccountSection /> : null}
       </ActionForm>
 
@@ -252,6 +257,41 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <CardHeader title={title} />
       <CardBody className="grid gap-4 sm:grid-cols-2">{children}</CardBody>
     </Card>
+  );
+}
+
+/** Active custom fields from Settings. `cf__present` tells the server these inputs were rendered. */
+function CustomFieldsSection({ defs, values }: CustomFieldsProp) {
+  const v = (values ?? {}) as Record<string, unknown>;
+  return (
+    <Section title="Additional details">
+      <input type="hidden" name="cf__present" value="1" />
+      {defs.map((f) => {
+        const name = cfName(f.key);
+        const cur = v[f.key];
+        const str = cur === undefined || cur === null ? "" : String(cur);
+        return f.type === "BOOLEAN" ? (
+          <FormField key={f.key} label={f.label} name={name} required={f.required}>
+            <Checkbox id={name} name={name} defaultChecked={cur === true} label="Yes" />
+          </FormField>
+        ) : (
+          <FormField key={f.key} label={f.label} name={name} required={f.required} className={f.type === "TEXT" ? "sm:col-span-2" : undefined}>
+            {f.type === "SELECT" ? (
+              <Select id={name} name={name} defaultValue={str}>
+                <option value="">{f.required ? "Pick one" : "Not specified"}</option>
+                {f.options.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <Input id={name} name={name} type={f.type === "NUMBER" ? "number" : f.type === "DATE" ? "date" : "text"} step={f.type === "NUMBER" ? "any" : undefined} defaultValue={str} />
+            )}
+          </FormField>
+        );
+      })}
+    </Section>
   );
 }
 

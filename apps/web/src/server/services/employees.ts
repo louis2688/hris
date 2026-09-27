@@ -13,9 +13,13 @@ import { hashPassword } from "../auth/session";
 import { audit } from "./audit";
 import { AppError, conflict, notFound } from "./errors";
 import { startDefaultChecklist } from "./onboarding";
+import { offboardingHook, recordDirectEdit, recordHire } from "./employment-events";
+import { toJson, type CustomValues } from "./custom-fields";
 
 /** Checklist hooks run after the employee write commits; a failure here must not fail the save. */
 const startChecklistSafe = (...a: Parameters<typeof startDefaultChecklist>) => startDefaultChecklist(...a).catch((e) => console.error("checklist start failed", e));
+/** Event rows are history; a failure here must not fail the save either. */
+const safe = (p: Promise<unknown>) => p.catch((e) => console.error("employment event failed", e));
 
 export const employeeSummarySelect = {
   id: true,
@@ -150,7 +154,7 @@ function contactData(d: EmployeeSelfUpdateInput) {
   };
 }
 
-export async function createEmployee(actor: SessionUser, d: CreateEmployeeInput) {
+export async function createEmployee(actor: SessionUser, d: CreateEmployeeInput, customFields?: CustomValues) {
   if (await prisma.employee.findUnique({ where: { employeeCode: d.employeeCode } })) throw conflict("Employee ID already in use");
   if (d.managerId === "") d.managerId = undefined;
 
@@ -167,7 +171,7 @@ export async function createEmployee(actor: SessionUser, d: CreateEmployeeInput)
         ? await tx.user.create({ data: { email: loginEmail, passwordHash: await hashPassword(initialPassword), role: d.role }, select: { id: true } })
         : null;
     return tx.employee.create({
-      data: { ...personalData(d), ...contactData(d), ...jobData(d), userId: user?.id ?? null },
+      data: { ...personalData(d), ...contactData(d), ...jobData(d), userId: user?.id ?? null, ...(customFields ? { customFields: toJson(customFields) } : {}) },
       select: employeeSummarySelect,
     });
   });
@@ -183,11 +187,20 @@ export async function createEmployee(actor: SessionUser, d: CreateEmployeeInput)
   }
 
   await audit(actor.id, "employee.create", "Employee", employee.id, { after: employee });
+  await safe(recordHire(actor.id, { ...jobIds(employee), id: employee.id, deletedAt: null, hireDate: employee.hireDate }));
   await startChecklistSafe(actor.id, employee.id, "ONBOARDING");
   return { employee, initialPassword: d.createAccount ? initialPassword : null };
 }
 
-export async function updateEmployee(actor: SessionUser, id: string, d: UpdateEmployeeInput) {
+const jobIds = (e: EmployeeSummary) => ({
+  jobTitleId: e.jobTitle?.id ?? null,
+  departmentId: e.department?.id ?? null,
+  locationId: e.location?.id ?? null,
+  managerId: e.manager?.id ?? null,
+  employmentStatus: e.employmentStatus,
+});
+
+export async function updateEmployee(actor: SessionUser, id: string, d: UpdateEmployeeInput, customFields?: CustomValues) {
   const before = await getEmployee(id);
   if (d.managerId === id) throw new AppError("An employee cannot report to themselves");
   if (d.employeeCode !== before.employeeCode) {
@@ -198,12 +211,13 @@ export async function updateEmployee(actor: SessionUser, id: string, d: UpdateEm
   }
   const after = await prisma.employee.update({
     where: { id },
-    data: { ...personalData(d), ...contactData(d), ...jobData(d) },
+    data: { ...personalData(d), ...contactData(d), ...jobData(d), ...(customFields ? { customFields: toJson(customFields) } : {}) },
     select: employeeSummarySelect,
   });
   await audit(actor.id, "employee.update", "Employee", id, { before, after });
-  const leaving = (s: string) => s === "RESIGNED" || s === "TERMINATED";
-  if (leaving(after.employmentStatus) && !leaving(before.employmentStatus)) await startChecklistSafe(actor.id, id, "OFFBOARDING", true);
+  const b = { id, deletedAt: null, jobTitleId: before.jobTitleId, departmentId: before.departmentId, locationId: before.locationId, managerId: before.managerId, employmentStatus: before.employmentStatus };
+  await safe(recordDirectEdit(actor.id, b, { ...jobIds(after), id, deletedAt: null }));
+  await offboardingHook(actor.id, id, before.employmentStatus, after.employmentStatus);
   return after;
 }
 

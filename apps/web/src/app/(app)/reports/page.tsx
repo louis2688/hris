@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarDays, Clock, Columns3, Timer, Users } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Clock, Columns3, FileClock, Timer, TrendingDown, Users } from "lucide-react";
 import { gate } from "@/server/auth/session";
 import { isStaff } from "@/server/authz";
 import { Card, PageHeader } from "@/components/ui/card";
@@ -12,6 +12,9 @@ const REPORTS = [
   { href: "/reports/leave", title: "Leave balances", description: "Entitled, used, pending and available days per leave type.", icon: CalendarDays },
   { href: "/reports/attendance", title: "Attendance summary", description: "Monthly DTR totals: presence, absences, late, undertime and OT.", icon: Clock },
   { href: "/reports/timesheets", title: "Timesheet hours", description: "Hours per employee per project for a date range.", icon: Timer },
+  { href: "/reports/turnover", title: "Turnover & tenure", description: "Start and end headcount, hires, separations, turnover % and average tenure.", icon: TrendingDown },
+  { href: "/reports/promotions", title: "Promotions & transfers", description: "Every promotion and transfer in a date range, applied or scheduled.", icon: ArrowUpRight },
+  { href: "/reports/expiring-documents", title: "Expiring documents", description: "Contracts, IDs and certificates expired or expiring in the next 60 days.", icon: FileClock },
   { href: "/reports/employees", title: "Employee report builder", description: "Pick columns and filters, then save the URL as your report.", icon: Columns3 },
 ];
 

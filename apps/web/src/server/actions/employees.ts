@@ -14,13 +14,17 @@ import { z } from "zod";
 import { requireRole, requireSession } from "../auth/session";
 import { assertAccessEmployee, isStaff } from "../authz";
 import * as svc from "../services/employees";
+import { parseCustomFields } from "../services/custom-fields";
+import { prisma } from "@hris/db";
 import { bools, formToObject, parse, run, type ActionResult } from "./_helpers";
 
 export async function createEmployeeAction(_p: ActionResult<{ id: string; initialPassword: string | null }> | undefined, fd: FormData): Promise<ActionResult<{ id: string; initialPassword: string | null }>> {
   const actor = await requireRole("ADMIN", "HR");
-  const p = parse(createEmployeeSchema, bools(formToObject(fd), ["createAccount"]));
-  if ("error" in p) return p.error;
-  const res = await run(() => svc.createEmployee(actor, p.data));
+  const raw = bools(formToObject(fd), ["createAccount"]);
+  const p = parse(createEmployeeSchema, raw);
+  const cf = await parseCustomFields(raw, {});
+  if ("error" in p || cf.fieldErrors) return mergeErrors(p, cf.fieldErrors);
+  const res = await run(() => svc.createEmployee(actor, p.data, cf.values));
   if (!res.ok) return res;
   revalidatePath("/employees");
   return { ok: true, data: { id: res.data.employee.id, initialPassword: res.data.initialPassword }, message: "Employee created" };
@@ -28,14 +32,23 @@ export async function createEmployeeAction(_p: ActionResult<{ id: string; initia
 
 export async function updateEmployeeAction(id: string, _p: ActionResult | undefined, fd: FormData): Promise<ActionResult> {
   const actor = await requireRole("ADMIN", "HR");
-  const p = parse(updateEmployeeSchema, formToObject(fd));
-  if ("error" in p) return p.error;
+  const raw = formToObject(fd);
+  const p = parse(updateEmployeeSchema, raw);
+  const cur = await prisma.employee.findUnique({ where: { id }, select: { customFields: true } });
+  const cf = await parseCustomFields(raw, cur?.customFields);
+  if ("error" in p || cf.fieldErrors) return mergeErrors(p, cf.fieldErrors);
   const res = await run(async () => {
-    await svc.updateEmployee(actor, id, p.data);
+    await svc.updateEmployee(actor, id, p.data, cf.values);
   }, "Saved");
   revalidatePath(`/employees/${id}`);
   revalidatePath("/employees");
   return res;
+}
+
+/** Standard + custom field errors in one response so the form highlights both. */
+function mergeErrors(p: { error: ActionResult<never> } | { data: unknown }, cfErrors?: Record<string, string[]>): ActionResult<never> {
+  const base = "error" in p && !p.error.ok ? p.error.fieldErrors : undefined;
+  return { ok: false, error: "Please fix the highlighted fields", fieldErrors: { ...base, ...cfErrors } };
 }
 
 export async function updateSelfAction(_p: ActionResult | undefined, fd: FormData): Promise<ActionResult> {

@@ -23,6 +23,8 @@ export async function uploadDocumentAction(_p: ActionResult | undefined, fd: For
     category: String(fd.get("category") ?? ""),
     // Absent = default (visible); the HR checkbox posts a hidden "false" plus "true" when ticked.
     visibleToEmployee: fd.has("visibleToEmployee") ? fd.getAll("visibleToEmployee").includes("true") : undefined,
+    expiresAt: String(fd.get("expiresAt") ?? "") || null,
+    requiresAck: fd.get("requiresAck") === "true",
   };
   if (!(file instanceof File)) return { ok: false, error: "Choose a file to upload" };
   const r = await run(async () => void (await docs.upload(actor, { ...input, file })), "Uploaded");

@@ -8,6 +8,8 @@ import { SelfEditForm } from "./self-edit-form";
 import { QualTab } from "@/components/qual-tab";
 import { DocumentsCard } from "@/components/documents-card";
 import { listForEmployee, uploadCategories } from "@/server/services/documents";
+import { hasCases } from "@/server/services/cases";
+import { MyCases } from "./cases";
 
 export const metadata: Metadata = { title: "My Info" };
 
@@ -29,12 +31,14 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       </Card>
     );
   }
-  const e = await getEmployee(user.employeeId);
+  const [e, withCases] = await Promise.all([getEmployee(user.employeeId), hasCases(user)]);
+  // The Cases tab only exists once an NTE was served.
+  const tabs = withCases ? [...TABS, { key: "cases", label: "Cases" }] : TABS;
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader title="My Info" />
       <ProfileHero e={e} />
-      <TabNav base="/me" tabs={TABS} active={tab} />
+      <TabNav base="/me" tabs={tabs} active={tab} />
       {tab === "edit" ? (
         <Card>
           <CardBody>
@@ -48,8 +52,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           docs={await listForEmployee(user, e.id)}
           employeeId={e.id}
           categories={uploadCategories(user, e.id)}
+          canAck
           description="Your employment documents. You can upload IDs and certificates."
         />
+      ) : tab === "cases" && withCases ? (
+        <MyCases user={user} />
       ) : tab === "emergency" ? (
         <EmergencyContacts employeeId={e.id} contacts={e.emergencyContacts} />
       ) : (
