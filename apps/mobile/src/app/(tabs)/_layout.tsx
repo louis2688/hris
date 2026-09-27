@@ -12,7 +12,15 @@ const icon =
 export default function TabsLayout() {
   const { user } = useAuth();
   return (
-    <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: C.brand, tabBarInactiveTintColor: C.subtle, sceneStyle: { backgroundColor: C.surface } }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: C.ink,
+        tabBarInactiveTintColor: C.subtle,
+        tabBarStyle: { backgroundColor: C.canvas, borderTopColor: C.border, borderTopWidth: 1, elevation: 0, shadowOpacity: 0 },
+        tabBarLabelStyle: { fontWeight: "600" },
+        sceneStyle: { backgroundColor: C.canvas },
+      }}>
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: icon("home-outline") }} />
       <Tabs.Screen name="attendance" options={{ title: "Attendance", tabBarIcon: icon("time-outline") }} />
       <Tabs.Screen name="leave" options={{ title: "Leave", tabBarIcon: icon("calendar-outline") }} />

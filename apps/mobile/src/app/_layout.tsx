@@ -7,10 +7,10 @@ function Nav() {
   const { user, ready } = useAuth();
   if (!ready) return null;
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.surface } }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.canvas } }}>
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="new-leave" options={{ presentation: "modal", headerShown: true, title: "New leave request", headerTintColor: C.brand }} />
+        <Stack.Screen name="new-leave" options={{ presentation: "modal", headerShown: true, title: "New leave request", headerTintColor: C.ink, headerStyle: { backgroundColor: C.canvas }, headerShadowVisible: false }} />
       </Stack.Protected>
       <Stack.Protected guard={!user}>
         <Stack.Screen name="login" />

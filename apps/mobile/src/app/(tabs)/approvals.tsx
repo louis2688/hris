@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { api, errorMessage, useApi, type LeaveItem } from "@/lib/api";
-import { Banner, Button, C, Card, Empty, fmtRange, s, Screen } from "@/lib/ui";
+import { Banner, Button, C, Card, Empty, fmtRange, Input, s, Screen } from "@/lib/ui";
 
 type Decision = "APPROVED" | "REJECTED";
 
@@ -46,7 +46,7 @@ export default function Approvals() {
                 {fmtRange(r.startDate, r.endDate)} · {Number(r.totalDays)} {Number(r.totalDays) === 1 ? "day" : "days"}
               </Text>
               {r.reason ? <Text style={[s.body, { color: C.muted }]}>"{r.reason}"</Text> : null}
-              <TextInput style={s.input} placeholder="Note (optional)" placeholderTextColor={C.subtle} value={notes[r.id] ?? ""} onChangeText={(v) => setNotes((n) => ({ ...n, [r.id]: v }))} maxLength={1000} />
+              <Input placeholder="Note (optional)" value={notes[r.id] ?? ""} onChangeText={(v) => setNotes((n) => ({ ...n, [r.id]: v }))} maxLength={1000} />
               <View style={s.row}>
                 <Button title="Reject" variant="danger" onPress={() => decide(r.id, "REJECTED")} loading={busy === r.id + "REJECTED"} disabled={!!busy} />
                 <Button title="Approve" onPress={() => decide(r.id, "APPROVED")} loading={busy === r.id + "APPROVED"} disabled={!!busy} />

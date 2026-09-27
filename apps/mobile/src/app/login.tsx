@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Banner, Button, C, s } from "@/lib/ui";
+import { Banner, Button, C, Input, s } from "@/lib/ui";
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -24,11 +24,11 @@ export default function Login() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.surface }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.canvas }}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, justifyContent: "center", padding: 24, gap: 28 }}>
         <View style={{ gap: 12 }}>
-          <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: C.brand, alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>H</Text>
+          <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: C.dark, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ color: C.onDark, fontSize: 22, fontWeight: "700" }}>H</Text>
           </View>
           <Text style={s.h1}>Welcome back</Text>
           <Text style={s.muted}>Sign in with your work account.</Text>
@@ -36,14 +36,14 @@ export default function Login() {
         <View style={{ gap: 14 }}>
           <View>
             <Text style={s.label}>Email</Text>
-            <TextInput style={s.input} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="username" placeholder="you@company.com" placeholderTextColor={C.subtle} />
+            <Input value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="username" placeholder="you@company.com" />
           </View>
           <View>
             <Text style={s.label}>Password</Text>
-            <TextInput style={s.input} value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" textContentType="password" onSubmitEditing={submit} returnKeyType="go" />
+            <Input value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" textContentType="password" onSubmitEditing={submit} returnKeyType="go" />
           </View>
           <Banner text={error} />
-          <Button title="Sign in" onPress={submit} loading={busy} />
+          <Button title="Sign in" variant="accent" onPress={submit} loading={busy} />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

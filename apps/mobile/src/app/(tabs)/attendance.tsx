@@ -7,7 +7,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import * as Location from "expo-location";
 import { fmtMinutes, PUNCH_METHOD_LABELS, type DtrStatus } from "@hris/shared";
 import { api, ApiError, errorMessage, useApi, type Dtr, type Punch, type Today } from "@/lib/api";
-import { Banner, Button, C, Card, Empty, fmtDay, fmtTime, monthLabel, Pill, s, Screen, todayIso } from "@/lib/ui";
+import { Banner, Button, C, Card, Empty, fmtDay, fmtTime, mono, monthLabel, Pill, s, Screen, todayIso } from "@/lib/ui";
 
 type PunchBody = { photo?: string; latitude?: number; longitude?: number };
 
@@ -32,14 +32,14 @@ async function locate(): Promise<PunchBody> {
 
 const addMonth = (ym: string, n: number) => new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + n, 1)).toISOString().slice(0, 7);
 
-const DTR_STATUS: Record<DtrStatus, [string, string, string]> = {
-  PRESENT: ["Present", C.green, C.greenSoft],
+const DTR_STATUS: Record<DtrStatus, [string, string, string, string?]> = {
+  PRESENT: ["Present", C.onDark, C.green],
   INCOMPLETE: ["Incomplete", C.amber, C.amberSoft],
   ABSENT: ["Absent", C.red, C.redSoft],
-  LEAVE: ["Leave", C.brand, C.brandSoft],
-  HOLIDAY: ["Holiday", "#7c3aed", "#f5f3ff"],
-  REST_DAY: ["Rest day", C.muted, "#f1f5f9"],
-  UPCOMING: ["Upcoming", C.subtle, "#f8fafc"],
+  LEAVE: ["Leave", C.ink, C.bone],
+  HOLIDAY: ["Holiday", C.ink, C.canvas, C.border],
+  REST_DAY: ["Rest day", C.mute, C.canvas, C.border],
+  UPCOMING: ["Upcoming", C.subtle, C.canvas, C.border],
 };
 
 export default function Attendance() {
@@ -107,16 +107,16 @@ export default function Attendance() {
       }}
     >
       <Card style={{ padding: 0, overflow: "hidden" }}>
-        <View style={{ backgroundColor: clockedIn ? C.green : C.brand, padding: 20, gap: 4 }}>
-          <Text style={{ color: "#fff", opacity: 0.85, fontSize: 14 }}>{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz })}</Text>
-          <Text style={{ color: "#fff", fontSize: 44, fontWeight: "800", letterSpacing: -1, fontVariant: ["tabular-nums"] }}>{fmtTime(now, tz)}</Text>
-          <Text style={{ color: "#fff", opacity: 0.9, fontSize: 14 }}>
+        <View style={{ backgroundColor: clockedIn ? C.dark : C.accent, padding: 20, gap: 4 }}>
+          <Text style={{ color: C.onDark, opacity: 0.8, fontSize: 14 }}>{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz })}</Text>
+          <Text style={{ color: "#ffffff", fontSize: 44, lineHeight: 50, fontWeight: "700", letterSpacing: -1.5, fontFamily: mono }}>{fmtTime(now, tz)}</Text>
+          <Text style={{ color: C.onDark, opacity: 0.9, fontSize: 14 }}>
             {clockedIn ? `Clocked in${lastIn ? ` since ${fmtTime(lastIn.at, tz)}` : ""}` : "Not clocked in"}
             {today.data?.shift ? ` · ${today.data.shift.name}` : ""}
           </Text>
         </View>
         <View style={{ padding: 16, gap: 12 }}>
-          <Button big title={clockedIn ? "Clock out" : "Clock in"} variant={clockedIn ? "dark" : "primary"} onPress={punch} loading={busy} disabled={!today.data} />
+          <Button big title={clockedIn ? "Clock out" : "Clock in"} variant={clockedIn ? "dark" : "accent"} onPress={punch} loading={busy} disabled={!today.data} />
           <Banner text={msg?.text ?? today.error} tone={msg?.tone} />
         </View>
       </Card>
@@ -127,11 +127,11 @@ export default function Attendance() {
           today.data.punches.map((p, i) => (
             <View key={p.id} style={s.between}>
               <View style={s.row}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: (p.direction ?? (i % 2 ? "OUT" : "IN")) === "IN" ? C.green : C.muted }} />
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: (p.direction ?? (i % 2 ? "OUT" : "IN")) === "IN" ? C.green : C.stone }} />
                 <Text style={s.body}>{(p.direction ?? (i % 2 ? "OUT" : "IN")) === "IN" ? "In" : "Out"}</Text>
                 <Text style={s.small}>{p.source === "MOBILE" ? "Mobile" : PUNCH_METHOD_LABELS[p.method]}</Text>
               </View>
-              <Text style={[s.body, { fontWeight: "600" }]}>{fmtTime(p.at, tz)}</Text>
+              <Text style={[s.body, s.mono, { fontWeight: "600" }]}>{fmtTime(p.at, tz)}</Text>
             </View>
           ))
         ) : (
@@ -142,16 +142,16 @@ export default function Attendance() {
       <Card>
         <View style={s.between}>
           <Pressable hitSlop={12} onPress={() => setMonth(addMonth(month, -1))}>
-            <Text style={{ fontSize: 22, color: C.brand }}>‹</Text>
+            <Text style={{ fontSize: 22, color: C.ink }}>‹</Text>
           </Pressable>
           <Text style={s.h2}>DTR · {monthLabel(month)}</Text>
           <Pressable hitSlop={12} disabled={month >= thisMonth} onPress={() => setMonth(addMonth(month, 1))}>
-            <Text style={{ fontSize: 22, color: month >= thisMonth ? C.border : C.brand }}>›</Text>
+            <Text style={{ fontSize: 22, color: month >= thisMonth ? C.stone : C.ink }}>›</Text>
           </Pressable>
         </View>
         <Banner text={dtr.error} />
         {t ? (
-          <View style={[s.between, { backgroundColor: C.surface, borderRadius: 14, padding: 12 }]}>
+          <View style={[s.between, { backgroundColor: C.bone, borderRadius: 12, padding: 12 }]}>
             {[
               ["Present", String(t.present)],
               ["Absent", String(t.absent)],
@@ -170,15 +170,15 @@ export default function Attendance() {
             .slice()
             .reverse()
             .map((d) => {
-              const [label, fg, bg] = DTR_STATUS[d.status];
+              const [label, fg, bg, border] = DTR_STATUS[d.status];
               return (
                 <View key={d.date} style={[s.between, { paddingVertical: 8, borderTopWidth: 1, borderColor: C.border }]}>
                   <View style={{ gap: 4, flex: 1 }}>
                     <Text style={[s.body, { fontWeight: "600" }]}>{fmtDay(d.date)}</Text>
-                    <Pill label={d.leave ? `${label} · ${d.leave.code}` : d.holiday ? `${label} · ${d.holiday}` : label} color={fg} bg={bg} />
+                    <Pill label={d.leave ? `${label} · ${d.leave.code}` : d.holiday ? `${label} · ${d.holiday}` : label} color={fg} bg={bg} border={border} />
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 2 }}>
-                    <Text style={s.body}>{d.timeIn || d.timeOut ? `${d.timeIn ?? "--:--"} - ${d.timeOut ?? "--:--"}` : "-"}</Text>
+                    <Text style={[s.body, s.mono]}>{d.timeIn || d.timeOut ? `${d.timeIn ?? "--:--"} - ${d.timeOut ?? "--:--"}` : "-"}</Text>
                     <Text style={s.small}>
                       {fmtMinutes(d.workedMinutes)}
                       {d.lateMinutes > 0 ? ` · ${d.lateMinutes}m late` : ""}

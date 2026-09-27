@@ -1,45 +1,75 @@
-import type { ReactNode } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { useState, type ReactNode } from "react";
+import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { LeaveBalance, LeaveStatus } from "@hris/shared";
 
-/** Web brand tokens (apps/web globals.css). */
+/** Design tokens (DESIGN.md: warm cream canvas, ink type, one hot-orange accent used scarcely). */
 export const C = {
-  brand: "#0052ff",
-  brandDark: "#0047e0",
-  brandSoft: "#eef4ff",
-  surface: "#f5f7fb",
+  accent: "#ea2804", // primary: only the single most consequential action per screen
+  accentPressed: "#c01f00",
+  canvas: "#f9f7f3",
+  bone: "#f3f0e8",
   card: "#ffffff",
-  ink: "#0f172a",
-  muted: "#475569",
-  subtle: "#94a3b8",
-  border: "#e2e8f0",
-  green: "#059669",
-  greenSoft: "#ecfdf5",
-  red: "#dc2626",
-  redSoft: "#fef2f2",
-  amber: "#b45309",
-  amberSoft: "#fffbeb",
+  dark: "#202020",
+  onDark: "#fcfcfc",
+  ink: "#202020",
+  body: "#3a3a3a",
+  muted: "#575757", // charcoal
+  mute: "#646464",
+  subtle: "#8d8d8d", // ash
+  stone: "#bbbbbb",
+  border: "rgba(32,32,32,0.12)", // hairline
+  green: "#2b9a66",
+  greenSoft: "#e8f4ee",
+  red: "#c8281c",
+  redSoft: "#fcebe8",
+  amber: "#a55a07",
+  amberSoft: "#fbf0dc",
 };
 
+/** Times and codes. ponytail: system mono, JetBrains Mono would need expo-font. */
+export const mono = Platform.select({ ios: "Menlo", default: "monospace" });
+
 export const s = StyleSheet.create({
-  h1: { fontSize: 26, fontWeight: "700", color: C.ink, letterSpacing: -0.4 },
-  h2: { fontSize: 17, fontWeight: "700", color: C.ink },
+  h1: { fontSize: 30, lineHeight: 34, fontWeight: "700", color: C.ink, letterSpacing: -0.8 },
+  h2: { fontSize: 18, lineHeight: 24, fontWeight: "600", color: C.ink, letterSpacing: -0.3 },
   body: { fontSize: 15, color: C.ink },
   muted: { fontSize: 13, color: C.muted },
-  small: { fontSize: 12, color: C.subtle },
+  small: { fontSize: 12, color: C.mute },
+  mono: { fontFamily: mono },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   between: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  input: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: C.ink, backgroundColor: C.card },
+  input: { borderWidth: 1, borderColor: C.border, borderRadius: 999, minHeight: 48, paddingHorizontal: 20, paddingVertical: 12, fontSize: 16, color: C.ink, backgroundColor: C.card },
+  inputMulti: { borderRadius: 12, minHeight: 96, textAlignVertical: "top" },
   label: { fontSize: 13, fontWeight: "600", color: C.muted, marginBottom: 6 },
 });
 
+/** Pill text input (rounded 12 when multiline); border goes ink on focus. */
+export function Input({ style, onFocus, onBlur, ...p }: TextInputProps) {
+  const [focus, setFocus] = useState(false);
+  return (
+    <TextInput
+      placeholderTextColor={C.subtle}
+      {...p}
+      style={[s.input, p.multiline && s.inputMulti, focus && { borderColor: C.ink }, style]}
+      onFocus={(e) => {
+        setFocus(true);
+        onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setFocus(false);
+        onBlur?.(e);
+      }}
+    />
+  );
+}
+
 export function Screen({ title, subtitle, loading, onRefresh, children }: { title: string; subtitle?: string; loading?: boolean; onRefresh?: () => void; children: ReactNode }) {
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: C.surface }}>
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: C.canvas }}>
       <ScrollView
         contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 40 }}
-        refreshControl={onRefresh ? <RefreshControl refreshing={!!loading} onRefresh={onRefresh} tintColor={C.brand} /> : undefined}
+        refreshControl={onRefresh ? <RefreshControl refreshing={!!loading} onRefresh={onRefresh} tintColor={C.ink} /> : undefined}
         keyboardShouldPersistTaps="handled"
       >
         <View style={{ gap: 2, marginBottom: 4 }}>
@@ -53,17 +83,17 @@ export function Screen({ title, subtitle, loading, onRefresh, children }: { titl
 }
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[{ backgroundColor: C.card, borderRadius: 18, padding: 18, gap: 10, borderWidth: 1, borderColor: C.border }, style]}>{children}</View>;
+  return <View style={[{ backgroundColor: C.card, borderRadius: 16, padding: 16, gap: 10, borderWidth: 1, borderColor: C.border }, style]}>{children}</View>;
 }
 
 const variants = {
-  primary: { bg: C.brand, fg: "#fff", border: C.brand },
-  dark: { bg: "#1e293b", fg: "#fff", border: "#1e293b" },
-  secondary: { bg: C.card, fg: C.ink, border: C.border },
-  danger: { bg: C.card, fg: C.red, border: "#fecaca" },
+  dark: { bg: C.dark, fg: C.onDark, border: C.dark, pressed: "#000000" },
+  accent: { bg: C.accent, fg: "#ffffff", border: C.accent, pressed: C.accentPressed },
+  outline: { bg: C.card, fg: C.ink, border: C.ink, pressed: C.bone },
+  danger: { bg: C.card, fg: C.red, border: C.red, pressed: C.redSoft },
 };
 
-export function Button({ title, onPress, variant = "primary", loading, disabled, big }: { title: string; onPress: () => void; variant?: keyof typeof variants; loading?: boolean; disabled?: boolean; big?: boolean }) {
+export function Button({ title, onPress, variant = "dark", loading, disabled, big }: { title: string; onPress: () => void; variant?: keyof typeof variants; loading?: boolean; disabled?: boolean; big?: boolean }) {
   const v = variants[variant];
   const off = disabled || loading;
   return (
@@ -72,37 +102,39 @@ export function Button({ title, onPress, variant = "primary", loading, disabled,
       onPress={onPress}
       disabled={off}
       style={({ pressed }) => ({
-        backgroundColor: v.bg,
+        backgroundColor: pressed ? v.pressed : v.bg,
         borderColor: v.border,
         borderWidth: 1,
-        borderRadius: big ? 18 : 12,
-        paddingVertical: big ? 20 : 12,
-        paddingHorizontal: 16,
+        borderRadius: 999,
+        minHeight: big ? 60 : 48,
+        paddingHorizontal: 24,
         alignItems: "center",
-        opacity: off ? 0.6 : pressed ? 0.85 : 1,
+        justifyContent: "center",
+        opacity: off ? 0.5 : 1,
         flexGrow: 1,
       })}
     >
-      {loading ? <ActivityIndicator color={v.fg} /> : <Text style={{ color: v.fg, fontWeight: "700", fontSize: big ? 18 : 15 }}>{title}</Text>}
+      {loading ? <ActivityIndicator color={v.fg} /> : <Text style={{ color: v.fg, fontWeight: "600", fontSize: big ? 18 : 16 }}>{title}</Text>}
     </Pressable>
   );
 }
 
-export function Pill({ label, color, bg }: { label: string; color: string; bg: string }) {
+/** Pass `border` for neutral tags (canvas + hairline). */
+export function Pill({ label, color, bg, border }: { label: string; color: string; bg: string; border?: string }) {
   return (
-    <View style={{ backgroundColor: bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: "flex-start" }}>
-      <Text style={{ color, fontSize: 12, fontWeight: "700" }}>{label}</Text>
+    <View style={{ backgroundColor: bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, alignSelf: "flex-start", borderWidth: border ? 1 : 0, borderColor: border }}>
+      <Text style={{ color, fontSize: 12, fontWeight: "600" }}>{label}</Text>
     </View>
   );
 }
 
-const STATUS: Record<LeaveStatus, [string, string]> = {
+const STATUS: Record<LeaveStatus, [string, string, string?]> = {
   PENDING: [C.amber, C.amberSoft],
-  APPROVED: [C.green, C.greenSoft],
+  APPROVED: [C.onDark, C.green],
   REJECTED: [C.red, C.redSoft],
-  CANCELLED: [C.muted, "#f1f5f9"],
+  CANCELLED: [C.mute, C.canvas, C.border],
 };
-export const StatusPill = ({ status }: { status: LeaveStatus }) => <Pill label={status.charAt(0) + status.slice(1).toLowerCase()} color={STATUS[status][0]} bg={STATUS[status][1]} />;
+export const StatusPill = ({ status }: { status: LeaveStatus }) => <Pill label={status.charAt(0) + status.slice(1).toLowerCase()} color={STATUS[status][0]} bg={STATUS[status][1]} border={STATUS[status][2]} />;
 
 export function Banner({ text, tone = "error" }: { text?: string | null; tone?: "error" | "ok" }) {
   if (!text) return null;
@@ -115,7 +147,7 @@ export function Banner({ text, tone = "error" }: { text?: string | null; tone?: 
 }
 
 export function Empty({ text, loading }: { text: string; loading?: boolean }) {
-  return <View style={{ paddingVertical: 20, alignItems: "center" }}>{loading ? <ActivityIndicator color={C.brand} /> : <Text style={s.muted}>{text}</Text>}</View>;
+  return <View style={{ paddingVertical: 20, alignItems: "center" }}>{loading ? <ActivityIndicator color={C.ink} /> : <Text style={s.muted}>{text}</Text>}</View>;
 }
 
 export function Balances({ balances, loading }: { balances?: LeaveBalance[]; loading?: boolean }) {
@@ -123,14 +155,14 @@ export function Balances({ balances, loading }: { balances?: LeaveBalance[]; loa
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
       {balances.map((b) => (
-        <View key={b.leaveTypeId} style={{ width: "48%", flexGrow: 1, backgroundColor: C.surface, borderRadius: 14, padding: 12, gap: 2 }}>
+        <View key={b.leaveTypeId} style={{ width: "48%", flexGrow: 1, backgroundColor: C.bone, borderRadius: 12, padding: 12, gap: 2 }}>
           <View style={s.row}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: b.color }} />
             <Text style={s.muted} numberOfLines={1}>
               {b.leaveTypeName}
             </Text>
           </View>
-          <Text style={{ fontSize: 22, fontWeight: "700", color: C.ink }}>
+          <Text style={{ fontSize: 22, fontWeight: "700", color: C.ink, letterSpacing: -0.5 }}>
             {b.available}
             <Text style={s.small}> / {b.entitled + b.carriedOver + b.adjustment}</Text>
           </Text>

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { countLeaveDays, createLeaveRequestSchema, DAY_PART_LABELS, DAY_PARTS, type DayPart, type LeaveBalance } from "@hris/shared";
 import { api, errorMessage, useApi } from "@/lib/api";
-import { Banner, Button, C, s, todayIso } from "@/lib/ui";
+import { Banner, Button, C, Input, s, todayIso } from "@/lib/ui";
 
 type LeaveType = { id: string; name: string; color: string; allowHalfDay: boolean; isPaid: boolean };
 const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
@@ -12,10 +12,10 @@ function Chip({ label, active, onPress, dot }: { label: string; active: boolean;
   return (
     <Pressable
       onPress={onPress}
-      style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: active ? C.brand : C.border, backgroundColor: active ? C.brandSoft : C.card }}
+      style={{ flexDirection: "row", alignItems: "center", gap: 6, minHeight: 40, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: active ? C.dark : C.border, backgroundColor: active ? C.dark : C.card }}
     >
       {dot ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dot }} /> : null}
-      <Text style={{ color: active ? C.brand : C.ink, fontWeight: active ? "700" : "500" }}>{label}</Text>
+      <Text style={{ color: active ? C.onDark : C.ink, fontWeight: "600" }}>{label}</Text>
     </Pressable>
   );
 }
@@ -68,7 +68,7 @@ export default function NewLeave() {
   }
 
   return (
-    <ScrollView style={{ backgroundColor: C.surface }} contentContainerStyle={{ padding: 20, gap: 18, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+    <ScrollView style={{ backgroundColor: C.canvas }} contentContainerStyle={{ padding: 20, gap: 18, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
       <View>
         <Text style={s.label}>Leave type</Text>
         <View style={[s.row, { flexWrap: "wrap" }]}>
@@ -82,8 +82,7 @@ export default function NewLeave() {
       <View style={[s.row, { alignItems: "flex-start" }]}>
         <View style={{ flex: 1 }}>
           <Text style={s.label}>From</Text>
-          <TextInput
-            style={s.input}
+          <Input
             value={start}
             onChangeText={(v) => {
               setStart(v);
@@ -96,7 +95,7 @@ export default function NewLeave() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.label}>To</Text>
-          <TextInput style={s.input} value={end} onChangeText={setEnd} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" maxLength={10} />
+          <Input value={end} onChangeText={setEnd} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" maxLength={10} />
         </View>
       </View>
 
@@ -113,11 +112,11 @@ export default function NewLeave() {
 
       <View>
         <Text style={s.label}>Reason (optional)</Text>
-        <TextInput style={[s.input, { minHeight: 90, textAlignVertical: "top" }]} value={reason} onChangeText={setReason} multiline maxLength={1000} />
+        <Input value={reason} onChangeText={setReason} multiline maxLength={1000} />
       </View>
 
-      <View style={{ backgroundColor: over ? C.amberSoft : C.brandSoft, borderRadius: 14, padding: 14, gap: 2 }}>
-        <Text style={{ fontSize: 24, fontWeight: "800", color: over ? C.amber : C.brand }}>
+      <View style={{ backgroundColor: over ? C.amberSoft : C.bone, borderRadius: 12, padding: 14, gap: 2 }}>
+        <Text style={{ fontSize: 24, fontWeight: "700", letterSpacing: -0.5, color: over ? C.amber : C.ink }}>
           {days} {days === 1 ? "day" : "days"}
         </Text>
         <Text style={s.muted}>{b ? `${b.available} available${over ? ". This is more than your balance." : ""}` : "Weekends excluded; holidays are deducted on submit."}</Text>

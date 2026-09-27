@@ -41,8 +41,8 @@ export default function Profile() {
     <Screen title="Profile" loading={me.loading} onRefresh={me.reload}>
       <Banner text={me.error} />
       <Card style={{ alignItems: "center", paddingVertical: 24 }}>
-        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: C.brandSoft, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ fontSize: 24, fontWeight: "800", color: C.brand }}>
+        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: C.bone, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ fontSize: 24, fontWeight: "700", letterSpacing: -0.5, color: C.ink }}>
             {(user?.name ?? "?")
               .split(" ")
               .map((w) => w[0])
@@ -62,7 +62,7 @@ export default function Profile() {
             .map(([k, v]) => (
               <View key={k} style={[s.between, { paddingVertical: 4 }]}>
                 <Text style={s.muted}>{k}</Text>
-                <Text style={[s.body, { flexShrink: 1, textAlign: "right" }]}>{v}</Text>
+                <Text style={[s.body, k === "Employee ID" && s.mono, { flexShrink: 1, textAlign: "right" }]}>{v}</Text>
               </View>
             ))}
         </Card>

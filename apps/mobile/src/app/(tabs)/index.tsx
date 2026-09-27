@@ -31,12 +31,12 @@ export default function Home() {
       <Banner text={today.error ?? bal.error ?? pending.error} />
 
       <Pressable onPress={() => router.navigate("/attendance")}>
-        <Card style={{ backgroundColor: today.data?.clockedIn ? C.green : C.brand, borderColor: "transparent" }}>
-          <Text style={{ color: "#fff", opacity: 0.85, fontSize: 13 }}>Today{today.data?.shift ? ` · ${today.data.shift.name} ${today.data.shift.startTime}-${today.data.shift.endTime}` : ""}</Text>
-          <Text style={{ color: "#fff", fontSize: 22, fontWeight: "700" }}>
+        <Card style={{ backgroundColor: today.data?.clockedIn ? C.dark : C.accent, borderColor: "transparent" }}>
+          <Text style={{ color: C.onDark, opacity: 0.8, fontSize: 13 }}>Today{today.data?.shift ? ` · ${today.data.shift.name} ${today.data.shift.startTime}-${today.data.shift.endTime}` : ""}</Text>
+          <Text style={{ color: "#ffffff", fontSize: 22, fontWeight: "700", letterSpacing: -0.4 }}>
             {today.data ? (today.data.clockedIn ? `Clocked in${lastIn ? ` since ${fmtTime(lastIn.at)}` : ""}` : "Not clocked in") : "Loading..."}
           </Text>
-          <Text style={{ color: "#fff", opacity: 0.9, fontSize: 13 }}>Tap to {today.data?.clockedIn ? "clock out" : "clock in"}</Text>
+          <Text style={{ color: C.onDark, opacity: 0.9, fontSize: 13 }}>Tap to {today.data?.clockedIn ? "clock out" : "clock in"}</Text>
         </Card>
       </Pressable>
 
@@ -47,7 +47,7 @@ export default function Home() {
               <Text style={s.h2}>Pending approvals</Text>
               <Text style={s.muted}>Leave requests waiting for you</Text>
             </View>
-            <Text style={{ fontSize: 28, fontWeight: "800", color: pending.data?.items.length ? C.amber : C.subtle }}>{pending.data?.items.length ?? "-"}</Text>
+            <Text style={{ fontSize: 28, fontWeight: "700", letterSpacing: -0.6, color: pending.data?.items.length ? C.amber : C.subtle }}>{pending.data?.items.length ?? "-"}</Text>
           </Card>
         </Pressable>
       ) : null}
