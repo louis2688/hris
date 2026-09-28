@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { LogoMark } from "@/components/logo-mark";
 import { usePathname } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
@@ -11,7 +12,6 @@ import {
   Clock,
   Fingerprint,
   Target,
-  Building2,
   CalendarDays,
   ChevronDown,
   KeyRound,
@@ -164,9 +164,7 @@ export function AppShell({ user, bell, children }: { user: SessionUser; bell: Re
               <Menu className="size-5" />
             </Dialog.Trigger>
             <div className="flex items-center gap-2 lg:hidden">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-brand-600 text-white">
-                <Building2 className="size-3.5" />
-              </span>
+              <LogoMark className="size-7" />
               <span className="font-display text-lg font-bold tracking-[-0.02em]">Ugnayo</span>
             </div>
             <div className="ml-auto flex items-center gap-2">
@@ -206,9 +204,7 @@ export function AppShell({ user, bell, children }: { user: SessionUser; bell: Re
 function Brand() {
   return (
     <Link href="/" prefetch={false} className="flex h-16 items-center gap-2.5 px-5">
-      <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">
-        <Building2 className="size-4" />
-      </span>
+      <LogoMark />
       <span className="font-display text-xl font-bold tracking-[-0.02em] text-ink">Ugnayo</span>
     </Link>
   );

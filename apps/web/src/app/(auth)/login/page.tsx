@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Building2 } from "lucide-react";
 import { getSession } from "@/server/auth/session";
 import { providerConfig, safeNext } from "@/server/auth/oidc";
 import { buttonVariants } from "@/components/ui/button";
 import { LoginForm } from "./login-form";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LogoMark } from "@/components/logo-mark";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -50,9 +50,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <ThemeToggle className="absolute right-4 top-4" />
       <div className="relative w-full max-w-sm animate-fade-up">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-5 flex size-12 items-center justify-center rounded-xl bg-ink text-on-dark">
-            <Building2 className="size-6" />
-          </div>
+          <LogoMark className="mb-5 size-12" />
           <h1 className="font-display text-[40px] font-bold leading-none tracking-[-0.03em] text-ink">Welcome back</h1>
           <p className="mt-3 text-sm text-ink-muted">Sign in with your company account</p>
         </div>

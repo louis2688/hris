@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LogoMark } from "@/components/logo-mark";
 import {
   ArrowRight,
   BarChart3,
-  Building2,
   CalendarDays,
   Check,
   ClipboardCheck,
@@ -117,9 +117,7 @@ export default function Landing() {
       <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5" aria-label="Ugnayo home">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">
-              <Building2 className="size-4" />
-            </span>
+            <LogoMark />
             <span className="font-display text-xl font-bold tracking-[-0.02em]">Ugnayo</span>
           </Link>
           <nav className="hidden flex-1 items-center gap-1 md:flex" aria-label="Sections">
@@ -329,9 +327,7 @@ export default function Landing() {
       <footer className="border-t border-hairline">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex items-center gap-2.5">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-brand-600 text-white">
-              <Building2 className="size-3.5" />
-            </span>
+            <LogoMark className="size-7" />
             <span className="font-display font-bold text-ink">Ugnayo</span>
             <span>© {new Date().getFullYear()}</span>
           </div>
