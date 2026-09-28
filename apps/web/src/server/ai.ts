@@ -4,7 +4,8 @@ import { AppError } from "./services/errors";
 
 /**
  * Minimal Claude Messages API client over fetch (no SDK).
- * Env: ANTHROPIC_API_KEY, AI_MODEL (default below), AI_PROVIDER=mock for a deterministic offline fake.
+ * Env: ANTHROPIC_API_KEY, ANTHROPIC_WORKSPACE_ID (only for keys not scoped to a workspace), AI_MODEL (default below),
+ * AI_PROVIDER=mock for a deterministic offline fake.
  * Never log prompts or tool data here: they contain personal data. Only status / error type / request id.
  */
 export const AI_NOT_CONFIGURED = "AI is not configured - ask an admin to set ANTHROPIC_API_KEY";
@@ -58,7 +59,13 @@ export async function chat(o: ChatOpts): Promise<Reply> {
   try {
     const res = await fetch(API, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+        // Keys not scoped to a workspace are rejected (400) unless the request names one.
+        ...(process.env.ANTHROPIC_WORKSPACE_ID ? { "anthropic-workspace-id": process.env.ANTHROPIC_WORKSPACE_ID } : {}),
+      },
       body: JSON.stringify({
         model: MODEL(),
         max_tokens: o.maxTokens,

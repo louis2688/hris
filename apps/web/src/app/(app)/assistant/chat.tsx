@@ -28,7 +28,10 @@ export function Chat({ firstName, mock }: { firstName: string; mock: boolean }) 
   const endRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
 
-  React.useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [msgs, status]);
+  // Braces matter: newer Chrome returns a Promise from scrollIntoView, and React would call it as the cleanup.
+  React.useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [msgs, status]);
 
   const patchLast = (f: (m: Msg) => Msg) => setMsgs((all) => [...all.slice(0, -1), f(all.at(-1)!)]);
 

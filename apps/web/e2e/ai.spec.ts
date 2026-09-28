@@ -5,6 +5,14 @@ import { login, USERS } from "./helpers";
 // The not-configured state is covered by aiProviderFor() unit tests in packages/shared/src/schemas/ai.test.ts.
 
 test("employee asks the assistant about leave and gets their real balance via the tool path", async ({ page }) => {
+  // Newer Chrome returns a Promise from scrollIntoView; an effect that returns it crashes React ("i is not a function").
+  await page.addInitScript(() => {
+    const orig = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element, ...a: Parameters<typeof orig>) {
+      orig.apply(this, a);
+      return Promise.resolve() as unknown as void;
+    };
+  });
   await login(page, USERS.employee);
   const { balances } = (await (await page.request.get("/api/v1/me/balances")).json()) as { balances: { leaveTypeName: string; available: number }[] };
   const vl = balances.find((b) => /vacation/i.test(b.leaveTypeName)) ?? balances[0]!;
