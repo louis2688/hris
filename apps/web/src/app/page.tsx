@@ -29,6 +29,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -129,6 +130,7 @@ export default function Landing() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle className="size-9" />
             <Link href="/login" className={buttonVariants({ variant: "ghost", size: "sm" })}>
               Sign in
             </Link>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const monogram = (name: string) =>
   name
@@ -20,7 +21,10 @@ export function PublicShell({ company, children, href = "/careers" }: { company:
             </span>
             <span className="truncate font-display text-lg font-bold tracking-[-0.02em]">{company}</span>
           </Link>
-          <span className="text-sm font-medium text-ink-muted">Careers</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-ink-muted">Careers</span>
+            <ThemeToggle className="size-9" />
+          </div>
         </div>
       </header>
       <main className="flex-1">{children}</main>

@@ -5,6 +5,7 @@ import { getSession } from "@/server/auth/session";
 import { providerConfig, safeNext } from "@/server/auth/oidc";
 import { buttonVariants } from "@/components/ui/button";
 import { LoginForm } from "./login-form";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -46,6 +47,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const ssoError = error ? (SSO_ERRORS[error] ?? SSO_ERRORS.sso_failed) : null;
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-surface px-4 py-10">
+      <ThemeToggle className="absolute right-4 top-4" />
       <div className="relative w-full max-w-sm animate-fade-up">
         <div className="mb-8 flex flex-col items-center text-center">
           <div className="mb-5 flex size-12 items-center justify-center rounded-xl bg-ink text-on-dark">
