@@ -31,6 +31,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
+import { getSession } from "@/server/auth/session";
 
 export const metadata: Metadata = {
   title: "Ugnayo - HR, payroll and time for Philippine teams",
@@ -107,7 +108,9 @@ const FAQ: [string, string][] = [
   ["Who can see salaries and government IDs?", "Only HR and admins. Managers and employees never receive those fields, not even through the API."],
 ];
 
-export default function Landing() {
+export default async function Landing() {
+  // Signed-in visitors (logo click from the app) get "Go to dashboard" instead of "Sign in". Makes / dynamic: one cached session lookup.
+  const signedIn = !!(await getSession());
   return (
     <div className="min-h-dvh overflow-x-clip bg-canvas text-ink">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-card focus:px-4 focus:py-2">
@@ -129,11 +132,13 @@ export default function Landing() {
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle className="size-9" />
-            <Link href="/login" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-              Sign in
-            </Link>
+            {signedIn ? null : (
+              <Link href="/login" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                Sign in
+              </Link>
+            )}
             <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
-              Open app
+              {signedIn ? "Go to dashboard" : "Open app"}
             </Link>
           </div>
         </div>
@@ -340,8 +345,8 @@ export default function Landing() {
             <Link href="/careers" className="hover:text-ink">
               Careers
             </Link>
-            <Link href="/login" className="hover:text-ink">
-              Sign in
+            <Link href={signedIn ? "/dashboard" : "/login"} className="hover:text-ink">
+              {signedIn ? "Dashboard" : "Sign in"}
             </Link>
           </nav>
         </div>
